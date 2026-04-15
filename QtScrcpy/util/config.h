@@ -10,7 +10,6 @@ struct UserBootConfig
     QString recordPath = "";
     quint32 bitRate = 2000000;
     quint16 maxSize = 0;             // 0 = native resolution
-    bool lowLatency = false;
     int recordFormatIndex = 0;
     int lockOrientationIndex = 0;
     bool recordScreen     = false;

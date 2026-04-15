@@ -60,9 +60,6 @@
 #define COMMON_MAX_SIZE_KEY         "MaxSize"
 #define COMMON_MAX_SIZE_DEF         0
 
-#define COMMON_LOW_LATENCY_KEY      "LowLatency"
-#define COMMON_LOW_LATENCY_DEF      false
-
 #define COMMON_RECORD_FORMAT_INDEX_KEY "RecordFormatIndex"
 #define COMMON_RECORD_FORMAT_INDEX_DEF 0
 
@@ -171,7 +168,6 @@ void Config::setUserBootConfig(const UserBootConfig &config)
     m_userData->setValue(COMMON_RECORD_KEY, config.recordPath);
     m_userData->setValue(COMMON_BITRATE_KEY, config.bitRate);
     m_userData->setValue(COMMON_MAX_SIZE_KEY, config.maxSize);
-    m_userData->setValue(COMMON_LOW_LATENCY_KEY, config.lowLatency);
     m_userData->setValue(COMMON_RECORD_FORMAT_INDEX_KEY, config.recordFormatIndex);
     m_userData->setValue(COMMON_FRAMELESS_WINDOW_KEY, config.framelessWindow);
     m_userData->setValue(COMMON_LOCK_ORIENTATION_INDEX_KEY, config.lockOrientationIndex);
@@ -207,7 +203,6 @@ UserBootConfig Config::getUserBootConfig()
     } else {
         config.maxSize = static_cast<quint16>(m_userData->value(COMMON_MAX_SIZE_KEY, COMMON_MAX_SIZE_DEF).toUInt());
     }
-    config.lowLatency = m_userData->value(COMMON_LOW_LATENCY_KEY, COMMON_LOW_LATENCY_DEF).toBool();
     config.recordFormatIndex = m_userData->value(COMMON_RECORD_FORMAT_INDEX_KEY, COMMON_RECORD_FORMAT_INDEX_DEF).toInt();
     config.lockOrientationIndex = m_userData->value(COMMON_LOCK_ORIENTATION_INDEX_KEY, COMMON_LOCK_ORIENTATION_INDEX_DEF).toInt();
     config.framelessWindow = m_userData->value(COMMON_FRAMELESS_WINDOW_KEY, COMMON_FRAMELESS_WINDOW_DEF).toBool();

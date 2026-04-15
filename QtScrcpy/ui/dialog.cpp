@@ -339,7 +339,6 @@ void Dialog::updateBootConfig(bool toView)
         } else {
             ui->maxSizeBox->setCurrentText(QString::number(config.maxSize));
         }
-        ui->lowLatencyCheck->setChecked(config.lowLatency);
         ui->formatBox->setCurrentIndex(config.recordFormatIndex);
         ui->recordPathEdt->setText(config.recordPath);
         ui->lockOrientationBox->setCurrentIndex(config.lockOrientationIndex);
@@ -361,7 +360,6 @@ void Dialog::updateBootConfig(bool toView)
         QString sizeText = ui->maxSizeBox->currentText().trimmed();
         config.maxSize = (sizeText == tr("Native") || sizeText == tr("original")) ? 0
                          : static_cast<quint16>(sizeText.toUShort());
-        config.lowLatency = ui->lowLatencyCheck->isChecked();
         config.recordFormatIndex = ui->formatBox->currentIndex();
         config.recordPath = ui->recordPathEdt->text();
         config.lockOrientationIndex = ui->lockOrientationBox->currentIndex();
@@ -490,7 +488,7 @@ void Dialog::on_startServerBtn_clicked()
     params.useReverse = ui->useReverseCheck->isChecked();
     params.display = !ui->notDisplayCheck->isChecked();
     params.renderExpiredFrames = Config::getInstance().getRenderExpiredFrames();
-    params.lowLatency = ui->lowLatencyCheck->isChecked();
+    params.lowLatency = true;
     if (ui->lockOrientationBox->currentIndex() > 0) {
         params.captureOrientationLock = 1;
         params.captureOrientation = (ui->lockOrientationBox->currentIndex() - 1) * 90;
