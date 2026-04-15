@@ -12,6 +12,7 @@
 #include <QThread>
 #include <QMutex>
 #include <QPropertyAnimation>
+#include <QScrollArea>
 #include <QMap>
 
 
@@ -141,6 +142,7 @@ private:
     bool m_connectionIsWifi = false;
     QMap<QString, qsc::DeviceParams> m_connectedParams;  // serial → params used at connect time
     QPointer<DeviceDashboard> m_dashboard;
+    QPointer<QScrollArea> m_panelContainer;   // scroll container for leftWidget overlay
     QPointer<QPushButton> m_toggleBtn;
     QPointer<QPropertyAnimation> m_panelAnim;
     bool m_panelOpen = false;

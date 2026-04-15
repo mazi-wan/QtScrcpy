@@ -249,14 +249,22 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
         mainLayout->addWidget(m_dashboard, 1);
     }
 
-    // Re-parent leftWidget as a direct Dialog child (absolute overlay)
-    ui->leftWidget->setParent(this);
-    int panelW = ui->leftWidget->sizeHint().width();
-    if (panelW <= 0) panelW = 320;
-    ui->leftWidget->resize(panelW, height());
-    ui->leftWidget->move(-panelW, 0);   // start off-screen left (closed)
-    ui->leftWidget->show();
-    ui->leftWidget->raise();            // keep above dashboard
+    // Wrap leftWidget in a QScrollArea so tall content is scrollable,
+    // then use the scroll area as the sliding overlay container.
+    ui->leftWidget->setAutoFillBackground(true);  // prevent transparency over dashboard
+
+    m_panelContainer = new QScrollArea(this);
+    m_panelContainer->setWidget(ui->leftWidget);
+    m_panelContainer->setWidgetResizable(true);
+    m_panelContainer->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_panelContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    m_panelContainer->setFrameShape(QFrame::NoFrame);
+
+    int panelW = 340;
+    m_panelContainer->resize(panelW, height());
+    m_panelContainer->move(-panelW, 0);   // start off-screen left (closed)
+    m_panelContainer->show();
+    m_panelContainer->raise();            // keep above dashboard
 
     // Fixed toggle button at the left edge of the dialog
     m_toggleBtn = new QPushButton("▶", this);
@@ -269,14 +277,14 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
     m_toggleBtn->raise();
     m_toggleBtn->show();
 
-    // Slide animation on leftWidget's pos property
-    m_panelAnim = new QPropertyAnimation(ui->leftWidget, "pos", this);
+    // Slide animation on the container's pos property
+    m_panelAnim = new QPropertyAnimation(m_panelContainer, "pos", this);
     m_panelAnim->setDuration(200);
 
     connect(m_toggleBtn, &QPushButton::clicked, this, [this]() {
         m_panelAnim->stop();
-        int panelWidth = ui->leftWidget->width();
-        QPoint currentPos = ui->leftWidget->pos();  // actual position after stop
+        int panelWidth = m_panelContainer->width();
+        QPoint currentPos = m_panelContainer->pos();
         if (!m_panelOpen) {
             m_panelAnim->setEasingCurve(QEasingCurve::OutCubic);
             m_panelAnim->setStartValue(currentPos);
@@ -492,13 +500,12 @@ void Dialog::closeEvent(QCloseEvent *event)
 void Dialog::resizeEvent(QResizeEvent *event)
 {
     QWidget::resizeEvent(event);
-    // Keep panel height in sync with dialog height
-    ui->leftWidget->resize(ui->leftWidget->width(), event->size().height());
-    // Keep panel at correct horizontal position (open=0, closed=off-screen)
-    if (!m_panelOpen) {
-        ui->leftWidget->move(-ui->leftWidget->width(), 0);
+    if (m_panelContainer) {
+        m_panelContainer->resize(m_panelContainer->width(), event->size().height());
+        if (!m_panelOpen) {
+            m_panelContainer->move(-m_panelContainer->width(), 0);
+        }
     }
-    // Reposition the toggle button at the left edge, vertically centered
     if (m_toggleBtn) {
         m_toggleBtn->move(0, event->size().height() / 2 - 15);
     }
