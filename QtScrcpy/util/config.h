@@ -53,6 +53,8 @@ public:
     UserBootConfig getUserBootConfig();
     void setTrayMessageShown(bool shown);
     bool getTrayMessageShown();
+    QStringList getCheckedDevices();
+    void setCheckedDevices(const QStringList &serials);
 
     // user data:device
     void setNickName(const QString &serial, const QString &name);

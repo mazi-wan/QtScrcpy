@@ -102,6 +102,8 @@
 #define COMMON_SHOW_TOOLBAR_KEY "showToolbar"
 #define COMMON_SHOW_TOOLBAR_DEF true
 
+#define COMMON_CHECKED_DEVICES_KEY  "CheckedDevices"
+
 // device config
 #define SERIAL_WINDOW_RECT_KEY_X "WindowRectX"
 #define SERIAL_WINDOW_RECT_KEY_Y "WindowRectY"
@@ -235,6 +237,22 @@ bool Config::getTrayMessageShown()
     shown = m_userData->value(COMMON_TRAY_MESSAGE_SHOWN_KEY, COMMON_TRAY_MESSAGE_SHOWN_DEF).toBool();
     m_userData->endGroup();
     return shown;
+}
+
+QStringList Config::getCheckedDevices()
+{
+    m_userData->beginGroup(GROUP_COMMON);
+    QStringList serials = m_userData->value(COMMON_CHECKED_DEVICES_KEY, QStringList()).toStringList();
+    m_userData->endGroup();
+    return serials;
+}
+
+void Config::setCheckedDevices(const QStringList &serials)
+{
+    m_userData->beginGroup(GROUP_COMMON);
+    m_userData->setValue(COMMON_CHECKED_DEVICES_KEY, serials);
+    m_userData->endGroup();
+    m_userData->sync();
 }
 
 void Config::setRect(const QString &serial, const QRect &rc)

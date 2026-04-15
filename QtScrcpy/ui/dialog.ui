@@ -145,6 +145,31 @@
            </property>
           </widget>
          </item>
+         <item>
+          <widget class="QWidget" name="deviceCheckBtnsWidget" native="true">
+           <layout class="QHBoxLayout" name="deviceCheckBtnsLayout">
+            <property name="leftMargin"><number>0</number></property>
+            <property name="topMargin"><number>0</number></property>
+            <property name="rightMargin"><number>0</number></property>
+            <property name="bottomMargin"><number>0</number></property>
+            <item>
+             <widget class="QPushButton" name="selectAllDevicesBtn">
+              <property name="text"><string>All</string></property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="deselectAllDevicesBtn">
+              <property name="text"><string>None</string></property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QPushButton" name="connectCheckedBtn">
+              <property name="text"><string>Connect Checked</string></property>
+             </widget>
+            </item>
+           </layout>
+          </widget>
+         </item>
         </layout>
        </widget>
       </item>

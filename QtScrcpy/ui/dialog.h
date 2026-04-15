@@ -85,6 +85,11 @@ private slots:
 
     void showIpEditMenu(const QPoint &pos);
 
+    void on_selectAllDevicesBtn_clicked();
+    void on_deselectAllDevicesBtn_clicked();
+    void on_connectCheckedBtn_clicked();
+    void onDeviceItemChanged(QListWidgetItem *item);
+
 private:
     bool checkAdbRun();
     void initUI();
@@ -105,6 +110,7 @@ private:
     void savePortHistory(const QString &port);
 
     void showPortEditMenu(const QPoint &pos);
+    void applyCheckStateToItem(QListWidgetItem *item, const QString &serial);
 
 protected:
     void closeEvent(QCloseEvent *event) override;
@@ -142,7 +148,7 @@ private:
     bool m_connectionIsWifi = false;
     QMap<QString, qsc::DeviceParams> m_connectedParams;  // serial → params used at connect time
     QPointer<DeviceDashboard> m_dashboard;
-    QPointer<QScrollArea> m_panelContainer;   // scroll container for leftWidget overlay
+    QPointer<QWidget> m_panelContainer;        // outer panel overlay container
     QPointer<QPushButton> m_toggleBtn;
     QPointer<QPropertyAnimation> m_panelAnim;
     bool m_panelOpen = false;

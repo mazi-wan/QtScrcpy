@@ -1,6 +1,9 @@
 ﻿#include <QCoreApplication>
 #include <QDebug>
 #include <QEasingCurve>
+#include <QHBoxLayout>
+#include <QScrollArea>
+#include <QVBoxLayout>
 #include <QFile>
 #include <QFileDialog>
 #include <QKeyEvent>
@@ -115,7 +118,7 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
                         displayName = device.manufacturer + " " + device.model;
                     }
 
-                    QString fullDisplayName = displayName;
+                    QString fullDisplayName = displayName + "-" + device.serial;
                     deviceDisplayList.append(fullDisplayName);
                     serialList.append(device.serial);
                 }
@@ -133,7 +136,9 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
                 // Add sorted devices to UI
                 for (const auto &sortedDevice : sortedDevices) {
                     ui->serialBox->addItem(sortedDevice.second);
-                    ui->connectedPhoneList->addItem(sortedDevice.first);
+                    auto *item = new QListWidgetItem(sortedDevice.first);
+                    ui->connectedPhoneList->addItem(item);
+                    applyCheckStateToItem(item, sortedDevice.second);
                 }
 
                 // Trigger async fetch for each device to get detailed properties
@@ -167,7 +172,7 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
                         }
                     }
 
-                    QString fullDisplayName = Config::getInstance().getNickName(serial) + "-" + serial + " (" + displayName + ")";
+                    QString fullDisplayName = displayName + "-" + serial;
                     deviceDisplayList.append(fullDisplayName);
                     serialList.append(serial);
                 }
@@ -185,9 +190,11 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
                 // Add sorted devices to UI
                 for (const auto &sortedDevice : sortedDevices) {
                     ui->serialBox->addItem(sortedDevice.second);
-                    ui->connectedPhoneList->addItem(sortedDevice.first);
+                    auto *item = new QListWidgetItem(sortedDevice.first);
+                    ui->connectedPhoneList->addItem(item);
+                    applyCheckStateToItem(item, sortedDevice.second);
                 }
-                
+
                 // Reset progress flag after lightweight device update
                 m_deviceUpdateInProgress = false;
             } else if (args.contains("show") && args.contains("wlan0")) {
@@ -249,22 +256,52 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
         mainLayout->addWidget(m_dashboard, 1);
     }
 
-    // Wrap leftWidget in a QScrollArea so tall content is scrollable,
-    // then use the scroll area as the sliding overlay container.
-    ui->leftWidget->setAutoFillBackground(true);  // prevent transparency over dashboard
+    // Create the panel overlay container
+    ui->leftWidget->setAutoFillBackground(true);
 
-    m_panelContainer = new QScrollArea(this);
-    m_panelContainer->setWidget(ui->leftWidget);
-    m_panelContainer->setWidgetResizable(true);
-    m_panelContainer->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    m_panelContainer->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-    m_panelContainer->setFrameShape(QFrame::NoFrame);
+    // Fixed header with action buttons at top (always visible, not scrollable)
+    auto *panelHeader = new QWidget(this);
+    panelHeader->setObjectName("panelHeader");
+    auto *headerLayout = new QHBoxLayout(panelHeader);
+    headerLayout->setContentsMargins(4, 4, 4, 4);
+    headerLayout->setSpacing(4);
+    auto *stopAllTopBtn = new QPushButton(tr("Stop All"), panelHeader);
+    auto *restartAllTopBtn = new QPushButton(tr("Restart All"), panelHeader);
+    headerLayout->addWidget(stopAllTopBtn);
+    headerLayout->addWidget(restartAllTopBtn);
+    connect(stopAllTopBtn, &QPushButton::clicked, this, &Dialog::on_stopAllServerBtn_clicked);
+    connect(restartAllTopBtn, &QPushButton::clicked, this, &Dialog::on_restartAllBtn_clicked);
+
+    // Hide the duplicate buttons inside the scrollable leftWidget
+    ui->stopAllServerBtn->hide();
+    ui->restartAllBtn->hide();
+
+    // Scrollable content area
+    auto *panelScroll = new QScrollArea();
+    panelScroll->setWidget(ui->leftWidget);
+    panelScroll->setWidgetResizable(true);
+    panelScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    panelScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    panelScroll->setFrameShape(QFrame::NoFrame);
+
+    // Outer container: stacks header + scroll area vertically
+    auto *panelWidget = new QWidget(this);
+    panelWidget->setObjectName("panelContainer");
+    panelWidget->setStyleSheet("QWidget#panelContainer { background-color: #E8ECF0; }"
+                               "QScrollArea { background-color: #E8ECF0; }");
+    auto *panelLayout = new QVBoxLayout(panelWidget);
+    panelLayout->setContentsMargins(0, 0, 0, 0);
+    panelLayout->setSpacing(0);
+    panelLayout->addWidget(panelHeader);
+    panelLayout->addWidget(panelScroll, 1);
+
+    m_panelContainer = panelWidget;
 
     int panelW = 340;
     m_panelContainer->resize(panelW, height());
-    m_panelContainer->move(-panelW, 0);   // start off-screen left (closed)
+    m_panelContainer->move(-panelW, 0);
     m_panelContainer->show();
-    m_panelContainer->raise();            // keep above dashboard
+    m_panelContainer->raise();
 
     // Fixed toggle button at the left edge of the dialog
     m_toggleBtn = new QPushButton("▶", this);
@@ -373,6 +410,9 @@ void Dialog::initUI()
         connect(ui->devicePortEdt->lineEdit(), &QWidget::customContextMenuRequested,
                 this, &Dialog::showPortEditMenu);
     }
+
+    connect(ui->connectedPhoneList, &QListWidget::itemChanged,
+            this, &Dialog::onDeviceItemChanged);
 }
 
 void Dialog::updateBootConfig(bool toView)
@@ -844,6 +884,57 @@ void Dialog::on_restartAllBtn_clicked()
         params.scid = QRandomGenerator::global()->bounded(1, 10000) & 0x7FFFFFFF;
         qsc::IDeviceManage::getInstance().connectDevice(params);
     }
+}
+
+void Dialog::applyCheckStateToItem(QListWidgetItem *item, const QString &serial)
+{
+    item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+    QStringList checked = Config::getInstance().getCheckedDevices();
+    item->setCheckState(checked.contains(serial) ? Qt::Checked : Qt::Unchecked);
+    item->setData(Qt::UserRole, serial);  // store serial for later lookup
+}
+
+void Dialog::on_selectAllDevicesBtn_clicked()
+{
+    for (int i = 0; i < ui->connectedPhoneList->count(); ++i) {
+        ui->connectedPhoneList->item(i)->setCheckState(Qt::Checked);
+    }
+}
+
+void Dialog::on_deselectAllDevicesBtn_clicked()
+{
+    for (int i = 0; i < ui->connectedPhoneList->count(); ++i) {
+        ui->connectedPhoneList->item(i)->setCheckState(Qt::Unchecked);
+    }
+}
+
+void Dialog::on_connectCheckedBtn_clicked()
+{
+    for (int i = 0; i < ui->connectedPhoneList->count(); ++i) {
+        QListWidgetItem *item = ui->connectedPhoneList->item(i);
+        if (item->checkState() == Qt::Checked) {
+            QString serial = item->data(Qt::UserRole).toString();
+            if (!serial.isEmpty()) {
+                ui->serialBox->setCurrentText(serial);
+                on_startServerBtn_clicked();
+            }
+        }
+    }
+}
+
+void Dialog::onDeviceItemChanged(QListWidgetItem *item)
+{
+    // Save updated checked state for all items
+    QStringList checked;
+    for (int i = 0; i < ui->connectedPhoneList->count(); ++i) {
+        QListWidgetItem *it = ui->connectedPhoneList->item(i);
+        if (it->checkState() == Qt::Checked) {
+            QString serial = it->data(Qt::UserRole).toString();
+            if (!serial.isEmpty()) checked << serial;
+        }
+    }
+    Config::getInstance().setCheckedDevices(checked);
+    Q_UNUSED(item)
 }
 
 void Dialog::on_refreshGameScriptBtn_clicked()
