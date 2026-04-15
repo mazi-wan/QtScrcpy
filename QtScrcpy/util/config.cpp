@@ -172,7 +172,6 @@ void Config::setUserBootConfig(const UserBootConfig &config)
     m_userData->setValue(COMMON_BITRATE_KEY, config.bitRate);
     m_userData->setValue(COMMON_MAX_SIZE_KEY, config.maxSize);
     m_userData->setValue(COMMON_LOW_LATENCY_KEY, config.lowLatency);
-    m_userData->remove(COMMON_MAX_SIZE_INDEX_KEY);  // remove legacy key
     m_userData->setValue(COMMON_RECORD_FORMAT_INDEX_KEY, config.recordFormatIndex);
     m_userData->setValue(COMMON_FRAMELESS_WINDOW_KEY, config.framelessWindow);
     m_userData->setValue(COMMON_LOCK_ORIENTATION_INDEX_KEY, config.lockOrientationIndex);
@@ -204,6 +203,7 @@ UserBootConfig Config::getUserBootConfig()
         config.maxSize = indexToSize[idx];
         m_userData->remove(COMMON_MAX_SIZE_INDEX_KEY);
         m_userData->setValue(COMMON_MAX_SIZE_KEY, config.maxSize);
+        m_userData->sync();  // flush migration immediately in case app exits before next save
     } else {
         config.maxSize = static_cast<quint16>(m_userData->value(COMMON_MAX_SIZE_KEY, COMMON_MAX_SIZE_DEF).toUInt());
     }
