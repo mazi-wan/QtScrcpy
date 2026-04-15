@@ -465,7 +465,7 @@ void Dialog::on_startServerBtn_clicked()
 {
     outLog("start server...", false);
 
-    // this is ok that "original" toUshort is 0
+    // "Native".toUShort() == 0, which correctly maps to native resolution (no scaling)
     quint16 videoSize = ui->maxSizeBox->currentText().trimmed().toUShort();
     qsc::DeviceParams params;
     params.serial = ui->serialBox->currentText().trimmed();

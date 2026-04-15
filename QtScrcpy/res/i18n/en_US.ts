@@ -16,6 +16,10 @@
         <translation>original</translation>
     </message>
     <message>
+        <source>Native</source>
+        <translation>Native</translation>
+    </message>
+    <message>
         <source>no lock</source>
         <translation>no lock</translation>
     </message>

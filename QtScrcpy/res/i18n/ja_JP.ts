@@ -16,6 +16,10 @@
       <translation>オリジナル</translation>
     </message>
     <message>
+      <source>Native</source>
+      <translation>ネイティブ</translation>
+    </message>
+    <message>
       <source>no lock</source>
       <translation>ロックなし</translation>
     </message>

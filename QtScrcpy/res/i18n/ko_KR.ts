@@ -16,6 +16,10 @@
         <translation>원본</translation>
     </message>
     <message>
+        <source>Native</source>
+        <translation>네이티브</translation>
+    </message>
+    <message>
         <source>no lock</source>
         <translation>잠금 없음</translation>
     </message>

@@ -16,6 +16,10 @@
         <translation>原始</translation>
     </message>
     <message>
+        <source>Native</source>
+        <translation>原始</translation>
+    </message>
+    <message>
         <source>no lock</source>
         <translation>不锁定</translation>
     </message>
