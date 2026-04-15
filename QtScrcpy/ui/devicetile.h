@@ -12,7 +12,8 @@ class DeviceTile : public QWidget
 {
     Q_OBJECT
 public:
-    explicit DeviceTile(const QString &serial, bool frameless, bool skin, bool showToolbar, QWidget *parent = nullptr);
+    explicit DeviceTile(const QString &serial, const QString &displayName,
+                        bool frameless, bool skin, bool showToolbar, QWidget *parent = nullptr);
     ~DeviceTile();
 
     const QString &serial() const;

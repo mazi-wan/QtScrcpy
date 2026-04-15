@@ -3,6 +3,8 @@
 #include "videoform.h"
 #include "config.h"
 
+#include "../groupcontroller/groupcontroller.h"
+
 #include <QDebug>
 #include <QFrame>
 #include <QGridLayout>
@@ -34,11 +36,10 @@ DeviceDashboard::~DeviceDashboard() {}
 void DeviceDashboard::onDeviceConnected(bool success, const QString &serial,
                                          const QString &deviceName, const QSize &size)
 {
-    Q_UNUSED(deviceName)
     if (!success) {
         return;
     }
-    addTile(serial, size);
+    addTile(serial, deviceName, size);
 }
 
 void DeviceDashboard::onDeviceDisconnected(const QString &serial)
@@ -46,7 +47,7 @@ void DeviceDashboard::onDeviceDisconnected(const QString &serial)
     removeTile(serial);
 }
 
-void DeviceDashboard::addTile(const QString &serial, const QSize &size)
+void DeviceDashboard::addTile(const QString &serial, const QString &deviceName, const QSize &size)
 {
     if (m_tiles.contains(serial)) {
         return;
@@ -63,17 +64,23 @@ void DeviceDashboard::addTile(const QString &serial, const QSize &size)
     bool skin = Config::getInstance().getSkin() != 0;
     bool showToolbar = bootConfig.showToolbar;
 
-    auto *tile = new DeviceTile(serial, frameless, skin, showToolbar, m_gridWidget);
+    auto *tile = new DeviceTile(serial, deviceName, frameless, skin, showToolbar, m_gridWidget);
     tile->updateShowSize(size);
 
     if (tile->videoForm()) {
         device->setUserData(static_cast<void *>(tile));
         device->registerDeviceObserver(tile->videoForm());
+
+        tile->videoForm()->showFPS(bootConfig.showFPS);
+        if (bootConfig.windowOnTop) {
+            tile->videoForm()->staysOnTop(true);
+        }
     }
 
     m_tiles.insert(serial, tile);
     m_insertionOrder.append(serial);
     relayoutGrid();
+    GroupController::instance().addDevice(serial);
 
     connect(tile, &DeviceTile::disconnectRequested, this, [](const QString &s) {
         qsc::IDeviceManage::getInstance().disconnectDevice(s);

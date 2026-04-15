@@ -8,7 +8,7 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
-DeviceTile::DeviceTile(const QString &serial, bool frameless, bool skin, bool showToolbar, QWidget *parent)
+DeviceTile::DeviceTile(const QString &serial, const QString &displayName, bool frameless, bool skin, bool showToolbar, QWidget *parent)
     : QWidget(parent)
     , m_serial(serial)
 {
@@ -18,7 +18,7 @@ DeviceTile::DeviceTile(const QString &serial, bool frameless, bool skin, bool sh
     headerLayout->setContentsMargins(4, 2, 4, 2);
     headerLayout->setSpacing(4);
 
-    m_titleLabel = new QLabel(serial, headerWidget);
+    m_titleLabel = new QLabel(displayName.isEmpty() ? serial : displayName, headerWidget);
     m_titleLabel->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
 
     m_popOutBtn = new QPushButton("↗", headerWidget);

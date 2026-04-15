@@ -22,7 +22,7 @@ public slots:
     void onDeviceDisconnected(const QString &serial);
 
 private:
-    void addTile(const QString &serial, const QSize &size);
+    void addTile(const QString &serial, const QString &deviceName, const QSize &size);
     void removeTile(const QString &serial);
     void relayoutGrid();
 

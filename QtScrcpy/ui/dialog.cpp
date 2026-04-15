@@ -15,7 +15,6 @@
 #include "devicedashboard.h"
 #include "dialog.h"
 #include "ui_dialog.h"
-#include "videoform.h"
 
 #ifdef Q_OS_WIN32
 #include "../util/winutils.h"
