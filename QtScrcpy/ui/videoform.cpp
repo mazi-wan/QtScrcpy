@@ -598,7 +598,9 @@ void VideoForm::mousePressEvent(QMouseEvent *event)
         }
     } else {
         if (event->button() == Qt::LeftButton) {
-            m_dragPosition = globalPos.toPoint() - frameGeometry().topLeft();
+            if (isWindow()) {  // only draggable when standalone; locked when embedded in tile
+                m_dragPosition = globalPos.toPoint() - frameGeometry().topLeft();
+            }
             event->accept();
         }
     }
