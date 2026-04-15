@@ -14,6 +14,7 @@ find_package(Qt${QT_VERSION_MAJOR} COMPONENTS LinguistTools REQUIRED)
 qt5_create_translation(QM_FILES ${CMAKE_CURRENT_SOURCE_DIR}/../.. ${QC_TS_FILES})
 # 自定义目标依赖QM_FILES，否则不会生成qm文件
 add_custom_target(QC_QM_GENERATOR DEPENDS ${QM_FILES})
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # qt5_create_translation的bug：cmake clean的时候会删除翻译好的ts文件，导致翻译丢失
 # （qt官方说qt6没问题，只用qt6的可以考虑qt5_create_translation）

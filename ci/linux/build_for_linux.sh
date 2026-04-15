@@ -44,14 +44,14 @@ if [ -d "$output_path" ]; then
     rm -rf $output_path
 fi
 
-cmake_params="-DCMAKE_PREFIX_PATH=$qt_cmake_path -DCMAKE_BUILD_TYPE=$build_mode"
+cmake_params="-DCMAKE_PREFIX_PATH=$qt_cmake_path -DCMAKE_BUILD_TYPE=$build_mode -DCMAKE_EXPORT_COMPILE_COMMANDS=1 -S . -B build"
 cmake $cmake_params .
 if [ $? -ne 0 ] ;then
     echo "error: CMake failed, exiting......"
     exit 1
 fi
 
-cmake --build . --config "$build_mode" -j8
+cmake --build . --config "$build_mode" -j$(nproc)
 if [ $? -ne 0 ] ;then
     echo "error: CMake build failed, exiting......"
     exit 1

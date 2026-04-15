@@ -17,6 +17,7 @@ set(QC_PROJECT_VERSION ${QC_FILE_VERSION})
 # Project declare
 project(${QC_PROJECT_NAME} VERSION ${QC_PROJECT_VERSION} LANGUAGES CXX)
 message(STATUS "[${PROJECT_NAME}] Project ${PROJECT_NAME} ${PROJECT_VERSION}")
+set(QT_DESIRED_VERSION 5)
 
 # QC define
 
@@ -393,3 +394,5 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
     ${LINK_LIBS}
     QtScrcpyCore
 )
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

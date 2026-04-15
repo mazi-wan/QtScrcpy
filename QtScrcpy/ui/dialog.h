@@ -8,11 +8,21 @@
 #include <QSystemTrayIcon>
 #include <QListWidget>
 #include <QTimer>
+#include <QDateTime>
+#include <QThread>
+#include <QMutex>
 
 
 #include "adbprocess.h"
 #include "../QtScrcpyCore/include/QtScrcpyCore.h"
 #include "audio/audiooutput.h"
+
+struct CsvDeviceInfo {
+    QString brand;
+    QString device;
+    QString manufacturer;
+    QString modelName;
+};
 
 namespace Ui
 {
@@ -35,6 +45,7 @@ public:
 private slots:
     void onDeviceConnected(bool success, const QString& serial, const QString& deviceName, const QSize& size);
     void onDeviceDisconnected(QString serial);
+    void onDeviceInfoUpdated(const qsc::DeviceInfo &info);
 
     void on_updateDevice_clicked();
     void on_startServerBtn_clicked();
@@ -74,7 +85,6 @@ private:
     void initUI();
     void updateBootConfig(bool toView = true);
     void execAdbCmd();
-    void delayMs(int ms);
     QString getGameScript(const QString &fileName);
     void slotActivated(QSystemTrayIcon::ActivationReason reason);
     int findDeviceFromeSerialBox(bool wifi);
@@ -82,6 +92,10 @@ private:
     const QString &getServerPath();
     void loadIpHistory();
     void saveIpHistory(const QString &ip);
+    QString getDeviceDisplayName(const QString &serial);
+    void loadDevicesCsv();
+    QString getDeviceModelFromCsv(const QString &deviceId);
+    void cacheDeviceInfo(const QString &serial, const QString &manufacturer, const QString &device);
     void loadPortHistory();
     void savePortHistory(const QString &port);
 
@@ -91,6 +105,20 @@ protected:
     void closeEvent(QCloseEvent *event);
 
 private:
+    enum ConnectionState {
+        CS_IDLE,
+        CS_STOPPING_ALL,
+        CS_UPDATING_DEVICES_INITIAL,
+        CS_GETTING_IP,
+        CS_STARTING_ADBD,
+        CS_WIRELESS_CONNECT,
+        CS_UPDATING_DEVICES_FINAL,
+        CS_STARTING_SERVER
+    };
+
+    void advanceConnectionState();
+    void startConnectionWorkflow(bool isWifi);
+
     Ui::Widget *ui;
     qsc::AdbProcess m_adb;
     QSystemTrayIcon *m_hideIcon;
@@ -99,6 +127,13 @@ private:
     QAction *m_quit;
     AudioOutput m_audioOutput;
     QTimer m_autoUpdatetimer;
+    QTimer m_connectionTimer;
+    QList<CsvDeviceInfo> m_devicesCsv;
+    QHash<QString, QPair<QString, QString>> m_deviceInfoCache; // serial -> (manufacturer, device)
+    QDateTime m_lastFullDeviceUpdate;
+    bool m_deviceUpdateInProgress;
+    ConnectionState m_connectionState = CS_IDLE;
+    bool m_connectionIsWifi = false;
 };
 
 #endif // DIALOG_H

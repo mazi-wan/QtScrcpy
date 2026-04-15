@@ -1,16 +1,20 @@
-﻿#include <QDebug>
+﻿#include <QCoreApplication>
+#include <QDebug>
 #include <QFile>
 #include <QFileDialog>
 #include <QKeyEvent>
+#include <QProcess>
 #include <QRandomGenerator>
+#include <QTextStream>
 #include <QTime>
 #include <QTimer>
+#include <algorithm>
 
+#include "../groupcontroller/groupcontroller.h"
 #include "config.h"
 #include "dialog.h"
 #include "ui_dialog.h"
 #include "videoform.h"
-#include "../groupcontroller/groupcontroller.h"
 
 #ifdef Q_OS_WIN32
 #include "../util/winutils.h"
@@ -35,6 +39,12 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
     ui->setupUi(this);
     initUI();
 
+    // Load CSV device database
+    loadDevicesCsv();
+    
+    // Initialize device update state
+    m_deviceUpdateInProgress = false;
+
     updateBootConfig(true);
 
     on_useSingleModeCheck_clicked();
@@ -44,6 +54,12 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
     if (ui->autoUpdatecheckBox->isChecked()) {
         m_autoUpdatetimer.start(5000);
     }
+
+    m_connectionTimer.setSingleShot(true);
+    connect(&m_connectionTimer, &QTimer::timeout, this, &Dialog::advanceConnectionState);
+
+    // Connect to device info updated signal for async property fetching
+    connect(&m_adb, &qsc::AdbProcess::deviceInfoUpdated, this, &Dialog::onDeviceInfoUpdated);
 
     connect(&m_adb, &qsc::AdbProcess::adbProcessResult, this, [this](qsc::AdbProcess::ADB_EXEC_RESULT processResult) {
         QString log = "";
@@ -62,20 +78,115 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
             if (args.contains("ifconfig") && args.contains("wlan0")) {
                 getIPbyIp();
             }
+            // Reset progress flag on error
+            if (args.contains("devices")) {
+                m_deviceUpdateInProgress = false;
+            }
             break;
         case qsc::AdbProcess::AER_ERROR_MISSING_BINARY:
             log = "adb not found";
+            // Reset progress flag on error
+            if (args.contains("devices")) {
+                m_deviceUpdateInProgress = false;
+            }
             break;
         case qsc::AdbProcess::AER_SUCCESS_EXEC:
             //log = m_adb.getStdOut();
-            if (args.contains("devices")) {
-                QStringList devices = m_adb.getDevicesSerialFromStdOut();
+            if (args.contains("devices") && args.contains("-l")) {
+                QList<qsc::DeviceInfo> devices = m_adb.getDevicesInfo();
                 ui->serialBox->clear();
                 ui->connectedPhoneList->clear();
-                for (auto &item : devices) {
-                    ui->serialBox->addItem(item);
-                    ui->connectedPhoneList->addItem(Config::getInstance().getNickName(item) + "-" + item);
+
+                // Create a list of device display items for sorting
+                QStringList deviceDisplayList;
+                QStringList serialList;
+
+                for (const auto &device : devices) {
+                    // Cache device info for future auto-updates
+                    cacheDeviceInfo(device.serial, device.manufacturer, device.device);
+
+                    // Try to get model name from CSV first
+                    QString displayName = getDeviceModelFromCsv(device.device);
+                    if (displayName.isEmpty()) {
+                        // Fallback to original method
+                        displayName = device.manufacturer + " " + device.model;
+                    }
+
+                    QString fullDisplayName = displayName;
+                    deviceDisplayList.append(fullDisplayName);
+                    serialList.append(device.serial);
                 }
+
+                // Sort devices alphabetically by display name
+                QList<QPair<QString, QString>> sortedDevices;
+                for (int i = 0; i < deviceDisplayList.size(); ++i) {
+                    sortedDevices.append(QPair<QString, QString>(deviceDisplayList[i], serialList[i]));
+                }
+
+                std::sort(sortedDevices.begin(), sortedDevices.end(), [](const QPair<QString, QString> &a, const QPair<QString, QString> &b) {
+                    return a.first < b.first;
+                });
+
+                // Add sorted devices to UI
+                for (const auto &sortedDevice : sortedDevices) {
+                    ui->serialBox->addItem(sortedDevice.second);
+                    ui->connectedPhoneList->addItem(sortedDevice.first);
+                }
+
+                // Trigger async fetch for each device to get detailed properties
+                for (const auto &device : devices) {
+                    m_adb.fetchDevicePropertiesAsync(device.serial);
+                }
+
+                // Reset progress flag after full device update
+                m_deviceUpdateInProgress = false;
+            } else if (args.contains("devices") && !args.contains("-l")) {
+                // Handle basic device list (for auto-updates) - use cached info
+                QStringList serials = m_adb.getDevicesSerialFromStdOut();
+                ui->serialBox->clear();
+                ui->connectedPhoneList->clear();
+
+                // Create a list of device display items for sorting
+                QStringList deviceDisplayList;
+                QStringList serialList;
+
+                for (const QString &serial : serials) {
+                    QString displayName = "Unknown Device";
+
+                    // Try to use cached info first
+                    if (m_deviceInfoCache.contains(serial)) {
+                        QPair<QString, QString> cached = m_deviceInfoCache[serial];
+                        QString csvModelName = getDeviceModelFromCsv(cached.second);
+                        if (!csvModelName.isEmpty()) {
+                            displayName = csvModelName;
+                        } else {
+                            displayName = cached.first + " Device";
+                        }
+                    }
+
+                    QString fullDisplayName = Config::getInstance().getNickName(serial) + "-" + serial + " (" + displayName + ")";
+                    deviceDisplayList.append(fullDisplayName);
+                    serialList.append(serial);
+                }
+
+                // Sort devices alphabetically by display name
+                QList<QPair<QString, QString>> sortedDevices;
+                for (int i = 0; i < deviceDisplayList.size(); ++i) {
+                    sortedDevices.append(QPair<QString, QString>(deviceDisplayList[i], serialList[i]));
+                }
+
+                std::sort(sortedDevices.begin(), sortedDevices.end(), [](const QPair<QString, QString> &a, const QPair<QString, QString> &b) {
+                    return a.first < b.first;
+                });
+
+                // Add sorted devices to UI
+                for (const auto &sortedDevice : sortedDevices) {
+                    ui->serialBox->addItem(sortedDevice.second);
+                    ui->connectedPhoneList->addItem(sortedDevice.first);
+                }
+                
+                // Reset progress flag after lightweight device update
+                m_deviceUpdateInProgress = false;
             } else if (args.contains("show") && args.contains("wlan0")) {
                 QString ip = m_adb.getDeviceIPFromStdOut();
                 if (ip.isEmpty()) {
@@ -181,8 +292,7 @@ void Dialog::initUI()
     // 为deviceIpEdt添加右键菜单
     if (ui->deviceIpEdt->lineEdit()) {
         ui->deviceIpEdt->lineEdit()->setContextMenuPolicy(Qt::CustomContextMenu);
-        connect(ui->deviceIpEdt->lineEdit(), &QWidget::customContextMenuRequested,
-                this, &Dialog::showIpEditMenu);
+        connect(ui->deviceIpEdt->lineEdit(), &QWidget::customContextMenuRequested, this, &Dialog::showIpEditMenu);
     }
     
     // 为devicePortEdt添加右键菜单
@@ -267,14 +377,7 @@ void Dialog::execAdbCmd()
 #endif
 }
 
-void Dialog::delayMs(int ms)
-{
-    QTime dieTime = QTime::currentTime().addMSecs(ms);
-
-    while (QTime::currentTime() < dieTime) {
-        QCoreApplication::processEvents(QEventLoop::AllEvents, 100);
-    }
-}
+// Removed delayMs() - replaced with async connection state machine
 
 QString Dialog::getGameScript(const QString &fileName)
 {
@@ -311,10 +414,7 @@ void Dialog::closeEvent(QCloseEvent *event)
     this->hide();
     if (!Config::getInstance().getTrayMessageShown()) {
         Config::getInstance().setTrayMessageShown(true);
-        m_hideIcon->showMessage(tr("Notice"),
-                                tr("Hidden here!"),
-                                QSystemTrayIcon::Information,
-                                3000);
+        m_hideIcon->showMessage(tr("Notice"), tr("Hidden here!"), QSystemTrayIcon::Information, 3000);
     }
     event->ignore();
 }
@@ -324,8 +424,30 @@ void Dialog::on_updateDevice_clicked()
     if (checkAdbRun()) {
         return;
     }
+    
+    // Prevent overlapping device updates to avoid blocking the main thread
+    if (m_deviceUpdateInProgress) {
+        qDebug() << "Device update already in progress, skipping...";
+        return;
+    }
+    
+    m_deviceUpdateInProgress = true;
     outLog("update devices...", false);
-    m_adb.execute("", QStringList() << "devices");
+
+    // For auto-updates, use a lightweight check and cache if recent full update was done
+    QDateTime now = QDateTime::currentDateTime();
+    bool isAutoUpdate = sender() == &m_autoUpdatetimer;
+
+    if (isAutoUpdate && m_lastFullDeviceUpdate.isValid() && m_lastFullDeviceUpdate.secsTo(now) < 30) {
+        // For auto-updates within 30 seconds, use basic device list without expensive ADB calls
+        m_adb.execute("", QStringList() << "devices");
+    } else {
+        // For manual updates or when cache is stale, do full update
+        m_adb.execute("", QStringList() << "devices" << "-l");
+        if (!isAutoUpdate) {
+            m_lastFullDeviceUpdate = now;
+        }
+    }
 }
 
 void Dialog::on_startServerBtn_clicked()
@@ -505,9 +627,8 @@ void Dialog::onDeviceConnected(bool success, const QString &serial, const QStrin
     auto videoForm = new VideoForm(ui->framelessCheck->isChecked(), Config::getInstance().getSkin(), ui->showToolbar->isChecked());
     videoForm->setSerial(serial);
 
-    qsc::IDeviceManage::getInstance().getDevice(serial)->setUserData(static_cast<void*>(videoForm));
+    qsc::IDeviceManage::getInstance().getDevice(serial)->setUserData(static_cast<void *>(videoForm));
     qsc::IDeviceManage::getInstance().getDevice(serial)->registerDeviceObserver(videoForm);
-
 
     videoForm->showFPS(ui->fpsCheck->isChecked());
 
@@ -519,11 +640,12 @@ void Dialog::onDeviceConnected(bool success, const QString &serial, const QStrin
     // must be show before updateShowSize
     videoForm->show();
 #endif
-    QString name = Config::getInstance().getNickName(serial);
-    if (name.isEmpty()) {
-        name = Config::getInstance().getTitle();
-    }
-    videoForm->setWindowTitle(name + "-" + serial);
+    // QString name = Config::getInstance().getNickName(serial);
+    // if (name.isEmpty()) {
+    //     name = getDeviceDisplayName(serial);
+    // }
+    QString name = getDeviceDisplayName(serial);
+    videoForm->setWindowTitle(name);
     videoForm->updateShowSize(size);
 
     bool deviceVer = size.height() > size.width();
@@ -538,7 +660,7 @@ void Dialog::onDeviceConnected(bool success, const QString &serial, const QStrin
 
 #ifdef Q_OS_WIN32
     // windows是show太早可以看到resize的过程
-    QTimer::singleShot(200, videoForm, [videoForm](){videoForm->show();});
+    QTimer::singleShot(200, videoForm, [videoForm]() { videoForm->show(); });
 #endif
 
     GroupController::instance().addDevice(serial);
@@ -553,10 +675,34 @@ void Dialog::onDeviceDisconnected(QString serial)
     }
     auto data = device->getUserData();
     if (data) {
-        VideoForm* vf = static_cast<VideoForm*>(data);
+        VideoForm *vf = static_cast<VideoForm *>(data);
         qsc::IDeviceManage::getInstance().getDevice(serial)->deRegisterDeviceObserver(vf);
         vf->close();
         vf->deleteLater();
+    }
+}
+
+void Dialog::onDeviceInfoUpdated(const qsc::DeviceInfo &info)
+{
+    // Update the cached device info
+    cacheDeviceInfo(info.serial, info.manufacturer, info.device);
+
+    // Find and update the device in connectedPhoneList
+    for (int i = 0; i < ui->serialBox->count(); ++i) {
+        if (ui->serialBox->itemText(i) == info.serial) {
+            QString displayName = getDeviceModelFromCsv(info.device);
+            if (displayName.isEmpty()) {
+                // Fallback: use manufacturer + model if no CSV match
+                // Since we don't have the model here, just use manufacturer
+                if (!info.manufacturer.isEmpty()) {
+                    displayName = info.manufacturer + " Device";
+                } else {
+                    displayName = "Unknown Device";
+                }
+            }
+            ui->connectedPhoneList->item(i)->setText(displayName);
+            break;
+        }
     }
 }
 
@@ -650,24 +796,13 @@ void Dialog::on_recordScreenCheck_clicked(bool checked)
 
 void Dialog::on_usbConnectBtn_clicked()
 {
-    on_stopAllServerBtn_clicked();
-    delayMs(200);
-    on_updateDevice_clicked();
-    delayMs(200);
-
-    int firstUsbDevice = findDeviceFromeSerialBox(false);
-    if (-1 == firstUsbDevice) {
-        qWarning() << "No use device is found!";
-        return;
-    }
-    ui->serialBox->setCurrentIndex(firstUsbDevice);
-
-    on_startServerBtn_clicked();
+    startConnectionWorkflow(false);
 }
 
 int Dialog::findDeviceFromeSerialBox(bool wifi)
 {
-    QString regStr = "\\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\:([0-9]|[1-9]\\d|[1-9]\\d{2}|[1-9]\\d{3}|[1-5]\\d{4}|6[0-4]\\d{3}|65[0-4]\\d{2}|655[0-2]\\d|6553[0-5])\\b";
+    QString regStr = "\\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\:([0-9]|[1-9]\\d|[1-9]\\d{2}|[1-9]\\d{3}|["
+                     "1-5]\\d{4}|6[0-4]\\d{3}|65[0-4]\\d{2}|655[0-2]\\d|6553[0-5])\\b";
 #if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
     QRegExp regIP(regStr);
 #else
@@ -690,39 +825,7 @@ int Dialog::findDeviceFromeSerialBox(bool wifi)
 
 void Dialog::on_wifiConnectBtn_clicked()
 {
-    on_stopAllServerBtn_clicked();
-    delayMs(200);
-
-    on_updateDevice_clicked();
-    delayMs(200);
-
-    int firstUsbDevice = findDeviceFromeSerialBox(false);
-    if (-1 == firstUsbDevice) {
-        qWarning() << "No use device is found!";
-        return;
-    }
-    ui->serialBox->setCurrentIndex(firstUsbDevice);
-
-    on_getIPBtn_clicked();
-    delayMs(200);
-
-    on_startAdbdBtn_clicked();
-    delayMs(1000);
-
-    on_wirelessConnectBtn_clicked();
-    delayMs(2000);
-
-    on_updateDevice_clicked();
-    delayMs(200);
-
-    int firstWifiDevice = findDeviceFromeSerialBox(true);
-    if (-1 == firstWifiDevice) {
-        qWarning() << "No wifi device is found!";
-        return;
-    }
-    ui->serialBox->setCurrentIndex(firstWifiDevice);
-
-    on_startServerBtn_clicked();
+    startConnectionWorkflow(true);
 }
 
 void Dialog::on_connectedPhoneList_itemDoubleClicked(QListWidgetItem *item)
@@ -767,8 +870,7 @@ void Dialog::on_serialBox_currentIndexChanged(const QString &arg1)
 
 quint32 Dialog::getBitRate()
 {
-    return ui->bitRateEdit->text().trimmed().toUInt() *
-            (ui->bitRateBox->currentText() == QString("Mbps") ? 1000000 : 1000);
+    return ui->bitRateEdit->text().trimmed().toUInt() * (ui->bitRateBox->currentText() == QString("Mbps") ? 1000000 : 1000);
 }
 
 const QString &Dialog::getServerPath()
@@ -835,9 +937,9 @@ void Dialog::saveIpHistory(const QString &ip)
     if (ip.isEmpty()) {
         return;
     }
-    
+
     Config::getInstance().saveIpHistory(ip);
-    
+
     // 更新ComboBox
     loadIpHistory();
     ui->deviceIpEdt->setCurrentText(ip);
@@ -847,16 +949,110 @@ void Dialog::showIpEditMenu(const QPoint &pos)
 {
     QMenu *menu = ui->deviceIpEdt->lineEdit()->createStandardContextMenu();
     menu->addSeparator();
-    
+
     QAction *clearHistoryAction = new QAction(tr("Clear History"), menu);
     connect(clearHistoryAction, &QAction::triggered, this, [this]() {
         Config::getInstance().clearIpHistory();
         loadIpHistory();
     });
-    
+
     menu->addAction(clearHistoryAction);
     menu->exec(ui->deviceIpEdt->lineEdit()->mapToGlobal(pos));
     delete menu;
+}
+
+QString Dialog::getDeviceDisplayName(const QString &serial)
+{
+    // First, check if we have device info from adb devices -l (already available)
+    QList<qsc::DeviceInfo> devices = m_adb.getDevicesInfo();
+    for (const auto &device : devices) {
+        if (device.serial == serial) {
+            // Try to get model name from CSV first
+            QString csvModelName = getDeviceModelFromCsv(device.device);
+            if (!csvModelName.isEmpty()) {
+                return csvModelName;
+            }
+
+            // If we have manufacturer and model, use them
+            if (!device.manufacturer.isEmpty() && !device.model.isEmpty()) {
+                return device.manufacturer + " " + device.model;
+            }
+        }
+    }
+
+    // Second, check cache for previously fetched detailed properties
+    if (m_deviceInfoCache.contains(serial)) {
+        const auto &cachedInfo = m_deviceInfoCache[serial];
+        QString csvModelName = getDeviceModelFromCsv(cachedInfo.second); // device ID
+        if (!csvModelName.isEmpty()) {
+            return csvModelName;
+        }
+        if (!cachedInfo.first.isEmpty()) { // manufacturer
+            return cachedInfo.first + " Device";
+        }
+    }
+
+    // Third, trigger async fetch for detailed properties (non-blocking)
+    // This will update the UI later via onDeviceInfoUpdated signal
+    m_adb.fetchDevicePropertiesAsync(serial);
+
+    // Return placeholder while fetching
+    return "Loading...";
+}
+
+void Dialog::loadDevicesCsv()
+{
+    m_devicesCsv.clear();
+
+    QString csvPath = QString::fromLocal8Bit(qgetenv("DEVICE_CSV_FILE"));
+    if (csvPath.isEmpty()) {
+        csvPath = QCoreApplication::applicationDirPath() + "/devices.csv";
+    }
+    QFile file(csvPath);
+
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        qWarning() << "Failed to open devices.csv:" << csvPath;
+        return;
+    }
+
+    QTextStream in(&file);
+    QString line = in.readLine(); // Skip header line
+
+    while (!in.atEnd()) {
+        line = in.readLine();
+        if (line.trimmed().isEmpty())
+            continue;
+
+        QStringList parts = line.split(",");
+        if (parts.count() >= 4) {
+            CsvDeviceInfo info;
+            info.brand = parts[0].trimmed();
+            info.device = parts[1].trimmed();
+            info.manufacturer = parts[2].trimmed();
+            info.modelName = parts[3].trimmed();
+
+            m_devicesCsv.append(info);
+        }
+    }
+
+    file.close();
+    qDebug() << "Loaded" << m_devicesCsv.size() << "devices from CSV";
+}
+
+QString Dialog::getDeviceModelFromCsv(const QString &deviceId)
+{
+    for (const auto &csvDevice : m_devicesCsv) {
+        if (csvDevice.device == deviceId) {
+            return csvDevice.manufacturer + " " + csvDevice.modelName;
+        }
+    }
+
+    return QString(); // Not found
+}
+
+void Dialog::cacheDeviceInfo(const QString &serial, const QString &manufacturer, const QString &device)
+{
+    m_deviceInfoCache[serial] = QPair<QString, QString>(manufacturer, device);
 }
 
 void Dialog::loadPortHistory()
@@ -889,14 +1085,100 @@ void Dialog::showPortEditMenu(const QPoint &pos)
 {
     QMenu *menu = ui->devicePortEdt->lineEdit()->createStandardContextMenu();
     menu->addSeparator();
-    
+
     QAction *clearHistoryAction = new QAction(tr("Clear History"), menu);
     connect(clearHistoryAction, &QAction::triggered, this, [this]() {
         Config::getInstance().clearPortHistory();
         loadPortHistory();
     });
-    
+
     menu->addAction(clearHistoryAction);
     menu->exec(ui->devicePortEdt->lineEdit()->mapToGlobal(pos));
     delete menu;
+}
+
+void Dialog::startConnectionWorkflow(bool isWifi)
+{
+    if (m_connectionState != CS_IDLE) {
+        qWarning("Connection workflow already in progress");
+        return;
+    }
+
+    m_connectionIsWifi = isWifi;
+    m_connectionState = CS_STOPPING_ALL;
+    on_stopAllServerBtn_clicked();
+    m_connectionTimer.start(200);
+}
+
+void Dialog::advanceConnectionState()
+{
+    m_connectionTimer.stop();
+
+    switch (m_connectionState) {
+    case CS_STOPPING_ALL:
+        m_connectionState = CS_UPDATING_DEVICES_INITIAL;
+        on_updateDevice_clicked();
+        m_connectionTimer.start(200);
+        break;
+
+    case CS_UPDATING_DEVICES_INITIAL:
+        {
+            int firstUsbDevice = findDeviceFromeSerialBox(false);
+            if (-1 == firstUsbDevice) {
+                qWarning() << "No USB device found!";
+                m_connectionState = CS_IDLE;
+                return;
+            }
+            ui->serialBox->setCurrentIndex(firstUsbDevice);
+
+            if (!m_connectionIsWifi) {
+                // USB connection - go directly to start server
+                m_connectionState = CS_IDLE;
+                on_startServerBtn_clicked();
+            } else {
+                // WiFi connection - continue workflow
+                m_connectionState = CS_GETTING_IP;
+                on_getIPBtn_clicked();
+                m_connectionTimer.start(200);
+            }
+        }
+        break;
+
+    case CS_GETTING_IP:
+        m_connectionState = CS_STARTING_ADBD;
+        on_startAdbdBtn_clicked();
+        m_connectionTimer.start(1000);
+        break;
+
+    case CS_STARTING_ADBD:
+        m_connectionState = CS_WIRELESS_CONNECT;
+        on_wirelessConnectBtn_clicked();
+        m_connectionTimer.start(2000);
+        break;
+
+    case CS_WIRELESS_CONNECT:
+        m_connectionState = CS_UPDATING_DEVICES_FINAL;
+        on_updateDevice_clicked();
+        m_connectionTimer.start(200);
+        break;
+
+    case CS_UPDATING_DEVICES_FINAL:
+        {
+            int firstWifiDevice = findDeviceFromeSerialBox(true);
+            if (-1 == firstWifiDevice) {
+                qWarning() << "No WiFi device found!";
+                m_connectionState = CS_IDLE;
+                return;
+            }
+            ui->serialBox->setCurrentIndex(firstWifiDevice);
+
+            m_connectionState = CS_IDLE;
+            on_startServerBtn_clicked();
+        }
+        break;
+
+    default:
+        m_connectionState = CS_IDLE;
+        break;
+    }
 }

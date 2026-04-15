@@ -15,3 +15,11 @@ build-*
 userdata.ini
 Info_Mac.plist
 /ci/build_temp
+.qt/
+CMakeFiles
+QtScrcpy_autogen
+cmake_install.cmake
+Makefile
+CMakeCache.txt
+compile_commands.json
+.cache

@@ -2,3 +2,5 @@
 project(all)
 
 add_subdirectory(QtScrcpy)
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

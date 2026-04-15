@@ -17,6 +17,7 @@ AudioOutput::AudioOutput(QObject *parent)
     : QObject(parent)
 {
     m_running = false;
+    m_stopping.storeRelaxed(0);
 #if (QT_VERSION < QT_VERSION_CHECK(6, 0, 0))
     m_audioOutput = nullptr;
 #else
@@ -28,6 +29,13 @@ AudioOutput::AudioOutput(QObject *parent)
     connect(&m_sndcpy, &QProcess::readyReadStandardError, this, [this]() {
         qInfo() << QString("AudioOutput::") << QString(m_sndcpy.readAllStandardError());
     });
+    connect(&m_sndcpy, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+            this, &AudioOutput::onSndcpyFinished);
+    connect(&m_sndcpyTimeoutTimer, &QTimer::timeout, this, &AudioOutput::onSndcpyTimeout);
+    m_sndcpyTimeoutTimer.setSingleShot(true);
+
+    // Connect signal to slot with QueuedConnection for thread-safe audio data handling
+    connect(this, &AudioOutput::audioDataReady, this, &AudioOutput::onAudioDataReady, Qt::QueuedConnection);
 }
 
 AudioOutput::~AudioOutput()
@@ -52,10 +60,14 @@ bool AudioOutput::start(const QString& serial, int port)
         return ret;
     }
 
-    startAudioOutput();
-    startRecvData(port);
+    // If we're waiting for sndcpy, audio will start in onSndcpyFinished
+    // Otherwise start immediately
+    if (!m_waitingForSndcpy) {
+        startAudioOutput();
+        startRecvData(port);
+        m_running = true;
+    }
 
-    m_running = true;
     return true;
 }
 
@@ -98,11 +110,11 @@ bool AudioOutput::runSndcpyProcess(const QString &serial, int port, bool wait)
         qWarning() << "AudioOutput::start sndcpy process failed";
         return false;
     }
-    if (!m_sndcpy.waitForFinished()) {
-        qWarning() << "AudioOutput::sndcpy process crashed";
-        return false;
-    }
 
+    // Instead of blocking with waitForFinished(), start async timeout
+    m_waitingForSndcpy = true;
+    m_pendingPort = port;
+    m_sndcpyTimeoutTimer.start(10000); // 10 second timeout
     return true;
 }
 
@@ -182,6 +194,8 @@ void AudioOutput::startRecvData(int port)
         stopRecvData();
     }
 
+    m_stopping.storeRelaxed(0);
+
     auto audioSocket = new QTcpSocket();
     audioSocket->moveToThread(&m_workerThread);
     connect(&m_workerThread, &QThread::finished, audioSocket, &QObject::deleteLater);
@@ -195,19 +209,17 @@ void AudioOutput::startRecvData(int port)
         qInfo("AudioOutput::audio socket connect success");
     });
     connect(audioSocket, &QIODevice::readyRead, audioSocket, [this, audioSocket]() {
+        if (m_stopping.loadRelaxed()) {
+            return;
+        }
+
         qint64 recv = audioSocket->bytesAvailable();
         //qDebug() << "AudioOutput::recv data:" << recv;
 
-        if (!m_outputDevice) {
-            return;
-        }
-        if (m_buffer.capacity() < recv) {
-            m_buffer.reserve(recv);
-        }
-
-        qint64 count = audioSocket->read(m_buffer.data(), recv);
-        m_outputDevice->write(m_buffer.data(), count);
-    });
+        // Read data and emit signal for thread-safe handling
+        QByteArray data = audioSocket->read(recv);
+        emit audioDataReady(data);
+    }, Qt::DirectConnection);
     connect(audioSocket, &QTcpSocket::stateChanged, audioSocket, [](QAbstractSocket::SocketState state) {
         qInfo() << "AudioOutput::audio socket state changed:" << state;
 
@@ -232,6 +244,52 @@ void AudioOutput::stopRecvData()
         return;
     }
 
+    m_stopping.storeRelaxed(1);  // Prevent new data processing
+
     m_workerThread.quit();
-    m_workerThread.wait();
+    if (!m_workerThread.wait(3000)) {
+        qWarning("Audio worker thread timeout, terminating");
+        m_workerThread.terminate();
+        m_workerThread.wait(1000);
+    }
+}
+
+void AudioOutput::onSndcpyFinished(int exitCode, QProcess::ExitStatus exitStatus)
+{
+    if (!m_waitingForSndcpy) {
+        return;
+    }
+
+    m_sndcpyTimeoutTimer.stop();
+    m_waitingForSndcpy = false;
+
+    if (exitStatus != QProcess::NormalExit || exitCode != 0) {
+        qWarning() << "AudioOutput::sndcpy process failed with exit code" << exitCode;
+        return;
+    }
+
+    // sndcpy completed successfully, start audio
+    startAudioOutput();
+    startRecvData(m_pendingPort);
+    m_running = true;
+}
+
+void AudioOutput::onSndcpyTimeout()
+{
+    if (!m_waitingForSndcpy) {
+        return;
+    }
+
+    m_waitingForSndcpy = false;
+    qWarning() << "AudioOutput::sndcpy process timeout after 10 seconds";
+    if (QProcess::NotRunning != m_sndcpy.state()) {
+        m_sndcpy.kill();
+    }
+}
+
+void AudioOutput::onAudioDataReady(const QByteArray &data)
+{
+    if (m_outputDevice && !data.isEmpty()) {
+        m_outputDevice->write(data);
+    }
 }
