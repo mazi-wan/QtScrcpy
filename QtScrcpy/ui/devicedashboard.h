@@ -16,6 +16,10 @@ public:
     explicit DeviceDashboard(QWidget *parent = nullptr);
     ~DeviceDashboard();
 
+    // Returns the optimal max_size (longer tile dimension in px) for the next device to connect.
+    // Pass this to DeviceParams.maxSize so the server streams at the tile's display resolution.
+    quint16 optimalMaxSize() const;
+
 public slots:
     void onDeviceConnected(bool success, const QString &serial,
                            const QString &deviceName, const QSize &size);

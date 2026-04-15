@@ -33,6 +33,24 @@ DeviceDashboard::DeviceDashboard(QWidget *parent)
 
 DeviceDashboard::~DeviceDashboard() {}
 
+quint16 DeviceDashboard::optimalMaxSize() const
+{
+    // Calculate expected tile size for the NEXT device (current count + 1)
+    int nextCount = m_tiles.size() + 1;
+    int cols = (nextCount <= 1) ? 1 : (nextCount <= 4) ? 2 : 3;
+    int rows = (nextCount + cols - 1) / cols;
+
+    QSize avail = m_scrollArea->viewport()->size();
+    if (!avail.isValid() || avail.isEmpty()) {
+        return 0;  // fallback: let caller use native or configured value
+    }
+
+    int tileW = avail.width() / cols;
+    int tileH = avail.height() / rows;
+    // Use the longer dimension so portrait and landscape devices are handled correctly
+    return static_cast<quint16>(qMax(tileW, tileH));
+}
+
 void DeviceDashboard::onDeviceConnected(bool success, const QString &serial,
                                          const QString &deviceName, const QSize &size)
 {
