@@ -40,6 +40,8 @@ DeviceTile::DeviceTile(const QString &serial, const QString &displayName, bool f
 
     m_videoForm = new VideoForm(frameless, skin, showToolbar, videoAreaWidget);
     m_videoForm->setSerial(serial);
+    m_videoForm->setFocusPolicy(Qt::StrongFocus);
+    setFocusProxy(m_videoForm);
     m_videoLayout->addWidget(m_videoForm);
 
     m_placeholder = new QLabel(tr("Detached"), videoAreaWidget);
@@ -103,6 +105,7 @@ void DeviceTile::attach()
     m_videoForm->removeEventFilter(this);
     m_videoForm->setParent(m_videoLayout->parentWidget());
     m_videoLayout->insertWidget(0, m_videoForm);
+    m_videoForm->setFocusPolicy(Qt::StrongFocus);
     m_videoForm->show();
 }
 
