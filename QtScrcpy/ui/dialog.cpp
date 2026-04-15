@@ -929,14 +929,23 @@ void Dialog::on_deselectAllDevicesBtn_clicked()
 void Dialog::on_connectCheckedBtn_clicked()
 {
     outLog("connect checked devices...", false);
+    QList<QString> serials;
     for (int i = 0; i < ui->connectedPhoneList->count(); ++i) {
         QListWidgetItem *item = ui->connectedPhoneList->item(i);
         if (item->checkState() != Qt::Checked) continue;
         QString serial = item->data(Qt::UserRole).toString();
-        if (!serial.isEmpty()) {
-            connectSerial(serial);  // directly build params; no UI state dependencies
-        }
+        if (!serial.isEmpty()) serials.append(serial);
     }
+    // Stagger connections: simultaneous adb push+shell for multiple devices races on the
+    // ADB daemon and prevents some devices from setting up their tunnel socket.
+    // A 3s gap lets each device reach SSS_RUNNING before the next one starts its push.
+    for (int i = 0; i < serials.size(); ++i) {
+        const QString s = serials[i];
+        QTimer::singleShot(i * 3000, this, [this, s]() {
+            connectSerial(s);
+        });
+    }
+    qDebug() << "[connectChecked] scheduled" << serials.size() << "connections with 3s stagger";
 }
 
 void Dialog::onDeviceItemChanged(QListWidgetItem *item)
