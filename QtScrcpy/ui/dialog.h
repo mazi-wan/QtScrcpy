@@ -12,6 +12,7 @@
 #include <QThread>
 #include <QMutex>
 #include <QPropertyAnimation>
+#include <QMap>
 
 
 #include "adbprocess.h"
@@ -62,6 +63,7 @@ private slots:
     void on_stopAdbBtn_clicked();
     void on_clearOut_clicked();
     void on_stopAllServerBtn_clicked();
+    void on_restartAllBtn_clicked();
     void on_refreshGameScriptBtn_clicked();
     void on_applyScriptBtn_clicked();
     void on_recordScreenCheck_clicked(bool checked);
@@ -137,6 +139,7 @@ private:
     bool m_deviceUpdateInProgress;
     ConnectionState m_connectionState = CS_IDLE;
     bool m_connectionIsWifi = false;
+    QMap<QString, qsc::DeviceParams> m_connectedParams;  // serial → params used at connect time
     QPointer<DeviceDashboard> m_dashboard;
     QPointer<QPushButton> m_toggleBtn;
     QPointer<QPropertyAnimation> m_panelAnim;

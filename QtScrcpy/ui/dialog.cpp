@@ -582,6 +582,11 @@ void Dialog::on_startServerBtn_clicked()
     params.scid = QRandomGenerator::global()->bounded(1, 10000) & 0x7FFFFFFF;
 
     qsc::IDeviceManage::getInstance().connectDevice(params);
+    // Snapshot params for restart; store raw user maxSize (before tile-cap) so
+    // restart can apply min(userSetting, newTileSize) correctly.
+    qsc::DeviceParams snapshot = params;
+    snapshot.maxSize = ui->maxSizeBox->currentText().trimmed().toUShort();
+    m_connectedParams[params.serial] = snapshot;
 }
 
 void Dialog::on_stopServerBtn_clicked()
@@ -730,6 +735,7 @@ void Dialog::onDeviceConnected(bool success, const QString &serial, const QStrin
 void Dialog::onDeviceDisconnected(QString serial)
 {
     GroupController::instance().removeDevice(serial);
+    m_connectedParams.remove(serial);
     outLog(tr("Device disconnected: %1").arg(serial));
 }
 
@@ -801,6 +807,34 @@ void Dialog::on_clearOut_clicked()
 void Dialog::on_stopAllServerBtn_clicked()
 {
     qsc::IDeviceManage::getInstance().disconnectAllDevice();
+}
+
+void Dialog::on_restartAllBtn_clicked()
+{
+    if (m_connectedParams.isEmpty()) {
+        return;
+    }
+
+    // Snapshot before disconnecting (map will be cleared by disconnect signals)
+    QList<qsc::DeviceParams> snapshot = m_connectedParams.values();
+
+    qsc::IDeviceManage::getInstance().disconnectAllDevice();
+
+    // Reconnect each device with recalculated max_size
+    for (qsc::DeviceParams params : snapshot) {
+        quint16 userMaxSize = params.maxSize;  // stored as original user value
+
+        if (m_dashboard) {
+            quint16 autoSize = m_dashboard->optimalMaxSize();
+            if (autoSize > 0) {
+                params.maxSize = (userMaxSize == 0) ? autoSize : qMin(userMaxSize, autoSize);
+            } else {
+                params.maxSize = userMaxSize;
+            }
+        }
+
+        qsc::IDeviceManage::getInstance().connectDevice(params);
+    }
 }
 
 void Dialog::on_refreshGameScriptBtn_clicked()
