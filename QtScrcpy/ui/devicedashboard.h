@@ -2,6 +2,7 @@
 
 #include <QHash>
 #include <QPointer>
+#include <QStringList>
 #include <QWidget>
 
 class DeviceTile;
@@ -26,6 +27,7 @@ private:
     void relayoutGrid();
 
     QHash<QString, QPointer<DeviceTile>> m_tiles;
+    QStringList m_insertionOrder;
     QGridLayout *m_gridLayout = nullptr;
     QScrollArea *m_scrollArea = nullptr;
     QWidget *m_gridWidget = nullptr;

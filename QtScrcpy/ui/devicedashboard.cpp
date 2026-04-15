@@ -51,21 +51,27 @@ void DeviceDashboard::addTile(const QString &serial, const QSize &size)
         return;
     }
 
-    bool frameless = false;
-    bool skin = static_cast<bool>(Config::getInstance().getSkin());
-    bool showToolbar = true;
+    // Verify device still exists (it could have disconnected between signal and slot)
+    auto device = qsc::IDeviceManage::getInstance().getDevice(serial);
+    if (!device) {
+        return;
+    }
+
+    UserBootConfig bootConfig = Config::getInstance().getUserBootConfig();
+    bool frameless = bootConfig.framelessWindow;
+    bool skin = Config::getInstance().getSkin() != 0;
+    bool showToolbar = bootConfig.showToolbar;
 
     auto *tile = new DeviceTile(serial, frameless, skin, showToolbar, m_gridWidget);
     tile->updateShowSize(size);
 
-    // Register the tile's VideoForm as a device observer
-    auto device = qsc::IDeviceManage::getInstance().getDevice(serial);
-    if (device && tile->videoForm()) {
+    if (tile->videoForm()) {
         device->setUserData(static_cast<void *>(tile));
         device->registerDeviceObserver(tile->videoForm());
     }
 
     m_tiles.insert(serial, tile);
+    m_insertionOrder.append(serial);
     relayoutGrid();
 
     connect(tile, &DeviceTile::disconnectRequested, this, [](const QString &s) {
@@ -92,10 +98,12 @@ void DeviceDashboard::removeTile(const QString &serial)
             device->deRegisterDeviceObserver(tile->videoForm());
         }
         m_tiles.erase(it);
+        m_insertionOrder.removeAll(serial);
         relayoutGrid();
         tile->deleteLater();
     } else {
         m_tiles.erase(it);
+        m_insertionOrder.removeAll(serial);
     }
 }
 
@@ -103,7 +111,8 @@ void DeviceDashboard::relayoutGrid()
 {
     // Remove all items from grid (widgets stay alive, just removed from layout)
     QList<DeviceTile *> activeTiles;
-    for (auto t : m_tiles) {
+    for (const QString &s : m_insertionOrder) {
+        auto t = m_tiles.value(s);
         if (t) {
             activeTiles.append(t);
             m_gridLayout->removeWidget(t);

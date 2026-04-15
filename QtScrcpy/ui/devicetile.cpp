@@ -60,7 +60,12 @@ DeviceTile::DeviceTile(const QString &serial, bool frameless, bool skin, bool sh
     connect(m_disconnectBtn, &QPushButton::clicked, this, &DeviceTile::onDisconnect);
 }
 
-DeviceTile::~DeviceTile() {}
+DeviceTile::~DeviceTile()
+{
+    if (m_detached && m_videoForm) {
+        m_videoForm->removeEventFilter(this);
+    }
+}
 
 const QString &DeviceTile::serial() const
 {
