@@ -8,14 +8,14 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # Linux build
-./ci/linux/build_for_linux.sh "Release"
+./ci/linux/build_for_linux.sh "Debug"
 
 # Using CMake directly
-cmake -DCMAKE_PREFIX_PATH=$qt_cmake_path -DCMAKE_BUILD_TYPE=Release -S . -B build
-cmake --build build --config Release -j8
+cmake -DCMAKE_PREFIX_PATH=$qt_cmake_path -DCMAKE_BUILD_TYPE=Debug -S . -B build
+cmake --build build --config Debug -j8
 
 # Output location
-./output/x64/Release/
+./output/x64/Debug/
 ```
 
 ### Required Dependencies

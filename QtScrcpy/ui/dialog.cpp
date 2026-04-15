@@ -497,12 +497,14 @@ void Dialog::on_startServerBtn_clicked()
     // "Native".toUShort() == 0, which correctly maps to native resolution (no scaling)
     quint16 videoSize = ui->maxSizeBox->currentText().trimmed().toUShort();
 
-    // When "Native" (0) is selected, auto-size to the tile's display resolution so the
-    // server doesn't stream more pixels than the tile can show.
-    if (videoSize == 0 && m_dashboard) {
+    // Always cap max_size at the tile's actual display size — there's no point streaming
+    // more pixels than the tile can show. The user-configured value is an upper bound:
+    //   Native (0)    → use tile size exactly
+    //   Explicit N    → use min(N, tileSize) so large explicit values are still capped
+    if (m_dashboard) {
         quint16 autoSize = m_dashboard->optimalMaxSize();
         if (autoSize > 0) {
-            videoSize = autoSize;
+            videoSize = (videoSize == 0) ? autoSize : qMin(videoSize, autoSize);
         }
     }
 
