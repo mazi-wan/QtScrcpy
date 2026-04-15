@@ -276,17 +276,16 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
     connect(m_toggleBtn, &QPushButton::clicked, this, [this]() {
         m_panelAnim->stop();
         int panelWidth = ui->leftWidget->width();
+        QPoint currentPos = ui->leftWidget->pos();  // actual position after stop
         if (!m_panelOpen) {
-            // Open: slide in from left
             m_panelAnim->setEasingCurve(QEasingCurve::OutCubic);
-            m_panelAnim->setStartValue(QPoint(-panelWidth, 0));
+            m_panelAnim->setStartValue(currentPos);
             m_panelAnim->setEndValue(QPoint(0, 0));
             m_panelOpen = true;
             m_toggleBtn->setText("◀");
         } else {
-            // Close: slide out to left
             m_panelAnim->setEasingCurve(QEasingCurve::InCubic);
-            m_panelAnim->setStartValue(QPoint(0, 0));
+            m_panelAnim->setStartValue(currentPos);
             m_panelAnim->setEndValue(QPoint(-panelWidth, 0));
             m_panelOpen = false;
             m_toggleBtn->setText("▶");
