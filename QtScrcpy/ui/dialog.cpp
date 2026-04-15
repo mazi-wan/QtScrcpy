@@ -1,8 +1,10 @@
 ﻿#include <QCoreApplication>
 #include <QDebug>
+#include <QEasingCurve>
 #include <QFile>
 #include <QFileDialog>
 #include <QKeyEvent>
+#include <QPropertyAnimation>
 #include <QPushButton>
 #include <QProcess>
 #include <QRandomGenerator>
@@ -238,29 +240,58 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
     connect(&qsc::IDeviceManage::getInstance(), &qsc::IDeviceManage::deviceConnected, this, &Dialog::onDeviceConnected);
     connect(&qsc::IDeviceManage::getInstance(), &qsc::IDeviceManage::deviceDisconnected, this, &Dialog::onDeviceDisconnected);
 
-    // Create the device dashboard and add it to the main horizontal layout
+    // Create dashboard — fills the full layout width now
     m_dashboard = new DeviceDashboard(this);
-    // The main layout is horizontalLayout_11; append dashboard after leftWidget
     auto *mainLayout = qobject_cast<QHBoxLayout *>(layout());
-
-    // Narrow toggle button between left panel and dashboard
-    auto *toggleBtn = new QPushButton("◀", this);
-    toggleBtn->setFixedWidth(18);
-    toggleBtn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
-    toggleBtn->setToolTip(tr("Toggle panel"));
-    toggleBtn->setStyleSheet(
-        "QPushButton { border: none; background: palette(mid); font-size: 10px; }"
-        "QPushButton:hover { background: palette(midlight); }");
-
     if (mainLayout) {
-        mainLayout->addWidget(toggleBtn);
-        mainLayout->addWidget(m_dashboard, 1);  // stretch factor 1
+        // Remove leftWidget from the layout so dashboard takes full width
+        mainLayout->removeWidget(ui->leftWidget);
+        mainLayout->addWidget(m_dashboard, 1);
     }
 
-    connect(toggleBtn, &QPushButton::clicked, this, [this, toggleBtn]() {
-        bool nowVisible = !ui->leftWidget->isVisible();
-        ui->leftWidget->setVisible(nowVisible);
-        toggleBtn->setText(nowVisible ? "◀" : "▶");
+    // Re-parent leftWidget as a direct Dialog child (absolute overlay)
+    ui->leftWidget->setParent(this);
+    int panelW = ui->leftWidget->sizeHint().width();
+    if (panelW <= 0) panelW = 320;
+    ui->leftWidget->resize(panelW, height());
+    ui->leftWidget->move(-panelW, 0);   // start off-screen left (closed)
+    ui->leftWidget->show();
+    ui->leftWidget->raise();            // keep above dashboard
+
+    // Fixed toggle button at the left edge of the dialog
+    m_toggleBtn = new QPushButton("▶", this);
+    m_toggleBtn->setFixedSize(18, 30);
+    m_toggleBtn->setToolTip(tr("Toggle panel"));
+    m_toggleBtn->setStyleSheet(
+        "QPushButton { border: none; background: palette(mid); font-size: 10px; }"
+        "QPushButton:hover { background: palette(midlight); }");
+    m_toggleBtn->move(0, height() / 2 - 15);
+    m_toggleBtn->raise();
+    m_toggleBtn->show();
+
+    // Slide animation on leftWidget's pos property
+    m_panelAnim = new QPropertyAnimation(ui->leftWidget, "pos", this);
+    m_panelAnim->setDuration(200);
+
+    connect(m_toggleBtn, &QPushButton::clicked, this, [this]() {
+        m_panelAnim->stop();
+        int panelWidth = ui->leftWidget->width();
+        if (!m_panelOpen) {
+            // Open: slide in from left
+            m_panelAnim->setEasingCurve(QEasingCurve::OutCubic);
+            m_panelAnim->setStartValue(QPoint(-panelWidth, 0));
+            m_panelAnim->setEndValue(QPoint(0, 0));
+            m_panelOpen = true;
+            m_toggleBtn->setText("◀");
+        } else {
+            // Close: slide out to left
+            m_panelAnim->setEasingCurve(QEasingCurve::InCubic);
+            m_panelAnim->setStartValue(QPoint(0, 0));
+            m_panelAnim->setEndValue(QPoint(-panelWidth, 0));
+            m_panelOpen = false;
+            m_toggleBtn->setText("▶");
+        }
+        m_panelAnim->start();
     });
 
     connect(&qsc::IDeviceManage::getInstance(), &qsc::IDeviceManage::deviceConnected,
@@ -457,6 +488,21 @@ void Dialog::closeEvent(QCloseEvent *event)
         m_hideIcon->showMessage(tr("Notice"), tr("Hidden here!"), QSystemTrayIcon::Information, 3000);
     }
     event->ignore();
+}
+
+void Dialog::resizeEvent(QResizeEvent *event)
+{
+    QWidget::resizeEvent(event);
+    // Keep panel height in sync with dialog height
+    ui->leftWidget->resize(ui->leftWidget->width(), event->size().height());
+    // Keep panel at correct horizontal position (open=0, closed=off-screen)
+    if (!m_panelOpen) {
+        ui->leftWidget->move(-ui->leftWidget->width(), 0);
+    }
+    // Reposition the toggle button at the left edge, vertically centered
+    if (m_toggleBtn) {
+        m_toggleBtn->move(0, event->size().height() / 2 - 15);
+    }
 }
 
 void Dialog::on_updateDevice_clicked()

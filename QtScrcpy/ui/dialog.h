@@ -11,6 +11,7 @@
 #include <QDateTime>
 #include <QThread>
 #include <QMutex>
+#include <QPropertyAnimation>
 
 
 #include "adbprocess.h"
@@ -104,6 +105,7 @@ private:
 
 protected:
     void closeEvent(QCloseEvent *event);
+    void resizeEvent(QResizeEvent *event) override;
 
 private:
     enum ConnectionState {
@@ -136,6 +138,9 @@ private:
     ConnectionState m_connectionState = CS_IDLE;
     bool m_connectionIsWifi = false;
     QPointer<DeviceDashboard> m_dashboard;
+    QPointer<QPushButton> m_toggleBtn;
+    QPointer<QPropertyAnimation> m_panelAnim;
+    bool m_panelOpen = false;
 };
 
 #endif // DIALOG_H
