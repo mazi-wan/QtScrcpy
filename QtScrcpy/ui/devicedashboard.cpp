@@ -60,8 +60,8 @@ void DeviceDashboard::addTile(const QString &serial, const QString &deviceName, 
     }
 
     UserBootConfig bootConfig = Config::getInstance().getUserBootConfig();
-    bool frameless = bootConfig.framelessWindow;
-    bool skin = Config::getInstance().getSkin() != 0;
+    bool frameless = false;  // frameless/skin cause WA_TranslucentBackground on child widgets,
+    bool skin = false;       // which breaks OpenGL rendering when embedded — always off for tiles
     bool showToolbar = bootConfig.showToolbar;
 
     auto *tile = new DeviceTile(serial, deviceName, frameless, skin, showToolbar, m_gridWidget);
