@@ -111,6 +111,7 @@ private:
 
     void showPortEditMenu(const QPoint &pos);
     void applyCheckStateToItem(QListWidgetItem *item, const QString &serial);
+    void connectSerial(const QString &serial);  // build DeviceParams and connect one device
 
 protected:
     void closeEvent(QCloseEvent *event) override;

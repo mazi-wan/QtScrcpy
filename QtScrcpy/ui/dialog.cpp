@@ -582,29 +582,22 @@ void Dialog::on_updateDevice_clicked()
     }
 }
 
-void Dialog::on_startServerBtn_clicked()
+void Dialog::connectSerial(const QString &serial)
 {
-    outLog("start server...", false);
-
-    // "Native".toUShort() == 0, which correctly maps to native resolution (no scaling)
-    quint16 videoSize = ui->maxSizeBox->currentText().trimmed().toUShort();
-
-    // Always cap max_size at the tile's actual display size — there's no point streaming
-    // more pixels than the tile can show. The user-configured value is an upper bound:
-    //   Native (0)    → use tile size exactly
-    //   Explicit N    → use min(N, tileSize) so large explicit values are still capped
+    // Raw user-configured max size (before tile-cap); stored in snapshot for restart
+    quint16 userMaxSize = ui->maxSizeBox->currentText().trimmed().toUShort();
+    quint16 videoSize = userMaxSize;
     if (m_dashboard) {
         quint16 autoSize = m_dashboard->optimalMaxSize();
         if (autoSize > 0) {
-            videoSize = (videoSize == 0) ? autoSize : qMin(videoSize, autoSize);
+            videoSize = (userMaxSize == 0) ? autoSize : qMin(userMaxSize, autoSize);
         }
     }
 
     qsc::DeviceParams params;
-    params.serial = ui->serialBox->currentText().trimmed();
+    params.serial = serial;
     params.maxSize = videoSize;
     params.bitRate = getBitRate();
-    // on devices with Android >= 10, the capture frame rate can be limited
     params.maxFps = static_cast<quint32>(Config::getInstance().getMaxFps());
     params.closeScreen = ui->closeScreenCheck->isChecked();
     params.useReverse = ui->useReverseCheck->isChecked();
@@ -629,11 +622,17 @@ void Dialog::on_startServerBtn_clicked()
     params.scid = QRandomGenerator::global()->bounded(1, 10000) & 0x7FFFFFFF;
 
     qsc::IDeviceManage::getInstance().connectDevice(params);
-    // Snapshot params for restart; store raw user maxSize (before tile-cap) so
-    // restart can apply min(userSetting, newTileSize) correctly.
+
+    // Store snapshot with raw user maxSize for restart recalculation
     qsc::DeviceParams snapshot = params;
-    snapshot.maxSize = ui->maxSizeBox->currentText().trimmed().toUShort();
-    m_connectedParams[params.serial] = snapshot;
+    snapshot.maxSize = userMaxSize;
+    m_connectedParams[serial] = snapshot;
+}
+
+void Dialog::on_startServerBtn_clicked()
+{
+    outLog("start server...", false);
+    connectSerial(ui->serialBox->currentText().trimmed());
 }
 
 void Dialog::on_stopServerBtn_clicked()
@@ -910,14 +909,13 @@ void Dialog::on_deselectAllDevicesBtn_clicked()
 
 void Dialog::on_connectCheckedBtn_clicked()
 {
+    outLog("connect checked devices...", false);
     for (int i = 0; i < ui->connectedPhoneList->count(); ++i) {
         QListWidgetItem *item = ui->connectedPhoneList->item(i);
-        if (item->checkState() == Qt::Checked) {
-            QString serial = item->data(Qt::UserRole).toString();
-            if (!serial.isEmpty()) {
-                ui->serialBox->setCurrentText(serial);
-                on_startServerBtn_clicked();
-            }
+        if (item->checkState() != Qt::Checked) continue;
+        QString serial = item->data(Qt::UserRole).toString();
+        if (!serial.isEmpty()) {
+            connectSerial(serial);  // directly build params; no UI state dependencies
         }
     }
 }
