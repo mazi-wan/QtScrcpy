@@ -727,6 +727,7 @@ void Dialog::onDeviceConnected(bool success, const QString &serial, const QStrin
     Q_UNUSED(size)
     if (!success) {
         outLog(tr("Failed to connect device: %1").arg(serial));
+        m_connectedParams.remove(serial);  // clean up pre-stored snapshot on failure
         return;
     }
     outLog(tr("Device connected: %1").arg(serial));
@@ -833,6 +834,7 @@ void Dialog::on_restartAllBtn_clicked()
             }
         }
 
+        params.scid = QRandomGenerator::global()->bounded(1, 10000) & 0x7FFFFFFF;
         qsc::IDeviceManage::getInstance().connectDevice(params);
     }
 }
