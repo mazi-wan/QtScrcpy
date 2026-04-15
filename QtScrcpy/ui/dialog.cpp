@@ -266,12 +266,15 @@ void Dialog::initUI()
 
     ui->bitRateEdit->setValidator(new QIntValidator(1, 99999, this));
 
+    ui->maxSizeBox->setEditable(true);
     ui->maxSizeBox->addItem("640");
     ui->maxSizeBox->addItem("720");
     ui->maxSizeBox->addItem("1080");
-    ui->maxSizeBox->addItem("1280");
+    ui->maxSizeBox->addItem("1440");
     ui->maxSizeBox->addItem("1920");
-    ui->maxSizeBox->addItem(tr("original"));
+    ui->maxSizeBox->addItem("2560");
+    ui->maxSizeBox->addItem(tr("Native"));
+    ui->maxSizeBox->setValidator(new QIntValidator(1, 9999, this));
 
     ui->formatBox->addItem("mp4");
     ui->formatBox->addItem("mkv");
@@ -318,7 +321,12 @@ void Dialog::updateBootConfig(bool toView)
             ui->bitRateBox->setCurrentText("Kbps");
         }
 
-        // TODO Task 5: restore maxSize UI binding (config.maxSize is now a raw pixel value)
+        if (config.maxSize == 0) {
+            ui->maxSizeBox->setCurrentText(tr("Native"));
+        } else {
+            ui->maxSizeBox->setCurrentText(QString::number(config.maxSize));
+        }
+        ui->lowLatencyCheck->setChecked(config.lowLatency);
         ui->formatBox->setCurrentIndex(config.recordFormatIndex);
         ui->recordPathEdt->setText(config.recordPath);
         ui->lockOrientationBox->setCurrentIndex(config.lockOrientationIndex);
@@ -337,7 +345,10 @@ void Dialog::updateBootConfig(bool toView)
         UserBootConfig config;
 
         config.bitRate = getBitRate();
-        // TODO Task 5: restore maxSize UI binding (config.maxSize is now a raw pixel value)
+        QString sizeText = ui->maxSizeBox->currentText().trimmed();
+        config.maxSize = (sizeText == tr("Native") || sizeText == tr("original")) ? 0
+                         : static_cast<quint16>(sizeText.toUShort());
+        config.lowLatency = ui->lowLatencyCheck->isChecked();
         config.recordFormatIndex = ui->formatBox->currentIndex();
         config.recordPath = ui->recordPathEdt->text();
         config.lockOrientationIndex = ui->lockOrientationBox->currentIndex();
@@ -466,6 +477,7 @@ void Dialog::on_startServerBtn_clicked()
     params.useReverse = ui->useReverseCheck->isChecked();
     params.display = !ui->notDisplayCheck->isChecked();
     params.renderExpiredFrames = Config::getInstance().getRenderExpiredFrames();
+    params.lowLatency = ui->lowLatencyCheck->isChecked();
     if (ui->lockOrientationBox->currentIndex() > 0) {
         params.captureOrientationLock = 1;
         params.captureOrientation = (ui->lockOrientationBox->currentIndex() - 1) * 90;

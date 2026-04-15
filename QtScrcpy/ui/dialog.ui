@@ -746,6 +746,13 @@
               </property>
              </widget>
             </item>
+            <item row="2" column="1">
+             <widget class="QCheckBox" name="lowLatencyCheck">
+              <property name="text">
+               <string>Low latency</string>
+              </property>
+             </widget>
+            </item>
            </layout>
           </widget>
          </item>
