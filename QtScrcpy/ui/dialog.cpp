@@ -3,6 +3,7 @@
 #include <QFile>
 #include <QFileDialog>
 #include <QKeyEvent>
+#include <QPushButton>
 #include <QProcess>
 #include <QRandomGenerator>
 #include <QTextStream>
@@ -241,9 +242,26 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
     m_dashboard = new DeviceDashboard(this);
     // The main layout is horizontalLayout_11; append dashboard after leftWidget
     auto *mainLayout = qobject_cast<QHBoxLayout *>(layout());
+
+    // Narrow toggle button between left panel and dashboard
+    auto *toggleBtn = new QPushButton("◀", this);
+    toggleBtn->setFixedWidth(18);
+    toggleBtn->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Expanding);
+    toggleBtn->setToolTip(tr("Toggle panel"));
+    toggleBtn->setStyleSheet(
+        "QPushButton { border: none; background: palette(mid); font-size: 10px; }"
+        "QPushButton:hover { background: palette(midlight); }");
+
     if (mainLayout) {
+        mainLayout->addWidget(toggleBtn);
         mainLayout->addWidget(m_dashboard, 1);  // stretch factor 1
     }
+
+    connect(toggleBtn, &QPushButton::clicked, this, [this, toggleBtn]() {
+        bool nowVisible = !ui->leftWidget->isVisible();
+        ui->leftWidget->setVisible(nowVisible);
+        toggleBtn->setText(nowVisible ? "◀" : "▶");
+    });
 
     connect(&qsc::IDeviceManage::getInstance(), &qsc::IDeviceManage::deviceConnected,
             m_dashboard, &DeviceDashboard::onDeviceConnected);
