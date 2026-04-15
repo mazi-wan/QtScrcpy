@@ -57,6 +57,12 @@
 #define COMMON_MAX_SIZE_INDEX_KEY "MaxSizeIndex"
 #define COMMON_MAX_SIZE_INDEX_DEF 2
 
+#define COMMON_MAX_SIZE_KEY         "MaxSize"
+#define COMMON_MAX_SIZE_DEF         0
+
+#define COMMON_LOW_LATENCY_KEY      "LowLatency"
+#define COMMON_LOW_LATENCY_DEF      false
+
 #define COMMON_RECORD_FORMAT_INDEX_KEY "RecordFormatIndex"
 #define COMMON_RECORD_FORMAT_INDEX_DEF 0
 
@@ -164,7 +170,9 @@ void Config::setUserBootConfig(const UserBootConfig &config)
     m_userData->beginGroup(GROUP_COMMON);
     m_userData->setValue(COMMON_RECORD_KEY, config.recordPath);
     m_userData->setValue(COMMON_BITRATE_KEY, config.bitRate);
-    m_userData->setValue(COMMON_MAX_SIZE_INDEX_KEY, config.maxSizeIndex);
+    m_userData->setValue(COMMON_MAX_SIZE_KEY, config.maxSize);
+    m_userData->setValue(COMMON_LOW_LATENCY_KEY, config.lowLatency);
+    m_userData->remove(COMMON_MAX_SIZE_INDEX_KEY);  // remove legacy key
     m_userData->setValue(COMMON_RECORD_FORMAT_INDEX_KEY, config.recordFormatIndex);
     m_userData->setValue(COMMON_FRAMELESS_WINDOW_KEY, config.framelessWindow);
     m_userData->setValue(COMMON_LOCK_ORIENTATION_INDEX_KEY, config.lockOrientationIndex);
@@ -188,7 +196,18 @@ UserBootConfig Config::getUserBootConfig()
     m_userData->beginGroup(GROUP_COMMON);
     config.recordPath = m_userData->value(COMMON_RECORD_KEY, COMMON_RECORD_DEF).toString();
     config.bitRate = m_userData->value(COMMON_BITRATE_KEY, COMMON_BITRATE_DEF).toUInt();
-    config.maxSizeIndex = m_userData->value(COMMON_MAX_SIZE_INDEX_KEY, COMMON_MAX_SIZE_INDEX_DEF).toInt();
+    // Migration: convert old maxSizeIndex to maxSize
+    if (m_userData->contains(COMMON_MAX_SIZE_INDEX_KEY)) {
+        static const quint16 indexToSize[] = {640, 720, 1080, 1280, 1920, 0};
+        int idx = m_userData->value(COMMON_MAX_SIZE_INDEX_KEY, 2).toInt();
+        if (idx < 0 || idx > 5) idx = 5;
+        config.maxSize = indexToSize[idx];
+        m_userData->remove(COMMON_MAX_SIZE_INDEX_KEY);
+        m_userData->setValue(COMMON_MAX_SIZE_KEY, config.maxSize);
+    } else {
+        config.maxSize = static_cast<quint16>(m_userData->value(COMMON_MAX_SIZE_KEY, COMMON_MAX_SIZE_DEF).toUInt());
+    }
+    config.lowLatency = m_userData->value(COMMON_LOW_LATENCY_KEY, COMMON_LOW_LATENCY_DEF).toBool();
     config.recordFormatIndex = m_userData->value(COMMON_RECORD_FORMAT_INDEX_KEY, COMMON_RECORD_FORMAT_INDEX_DEF).toInt();
     config.lockOrientationIndex = m_userData->value(COMMON_LOCK_ORIENTATION_INDEX_KEY, COMMON_LOCK_ORIENTATION_INDEX_DEF).toInt();
     config.framelessWindow = m_userData->value(COMMON_FRAMELESS_WINDOW_KEY, COMMON_FRAMELESS_WINDOW_DEF).toBool();

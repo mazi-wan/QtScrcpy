@@ -318,7 +318,7 @@ void Dialog::updateBootConfig(bool toView)
             ui->bitRateBox->setCurrentText("Kbps");
         }
 
-        ui->maxSizeBox->setCurrentIndex(config.maxSizeIndex);
+        // TODO Task 5: restore maxSize UI binding (config.maxSize is now a raw pixel value)
         ui->formatBox->setCurrentIndex(config.recordFormatIndex);
         ui->recordPathEdt->setText(config.recordPath);
         ui->lockOrientationBox->setCurrentIndex(config.lockOrientationIndex);
@@ -337,7 +337,7 @@ void Dialog::updateBootConfig(bool toView)
         UserBootConfig config;
 
         config.bitRate = getBitRate();
-        config.maxSizeIndex = ui->maxSizeBox->currentIndex();
+        // TODO Task 5: restore maxSize UI binding (config.maxSize is now a raw pixel value)
         config.recordFormatIndex = ui->formatBox->currentIndex();
         config.recordPath = ui->recordPathEdt->text();
         config.lockOrientationIndex = ui->lockOrientationBox->currentIndex();
