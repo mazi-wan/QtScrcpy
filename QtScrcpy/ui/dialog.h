@@ -30,6 +30,7 @@ namespace Ui
 }
 
 class QYUVOpenGLWidget;
+class DeviceDashboard;
 class Dialog : public QWidget
 {
     Q_OBJECT
@@ -134,6 +135,7 @@ private:
     bool m_deviceUpdateInProgress;
     ConnectionState m_connectionState = CS_IDLE;
     bool m_connectionIsWifi = false;
+    QPointer<DeviceDashboard> m_dashboard;
 };
 
 #endif // DIALOG_H

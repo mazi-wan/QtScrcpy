@@ -1,5 +1,6 @@
 #include "devicedashboard.h"
 #include "devicetile.h"
+#include "videoform.h"
 #include "config.h"
 
 #include <QDebug>
@@ -91,7 +92,7 @@ void DeviceDashboard::removeTile(const QString &serial)
         return;
     }
 
-    auto *tile = it.value();
+    DeviceTile *tile = it.value();
     if (tile) {
         auto device = qsc::IDeviceManage::getInstance().getDevice(serial);
         if (device && tile->videoForm()) {

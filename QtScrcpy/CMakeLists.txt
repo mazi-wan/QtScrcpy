@@ -180,6 +180,10 @@ set(QC_UI_SOURCES
     ui/dialog.cpp
     ui/dialog.h
     ui/dialog.ui
+    ui/devicetile.h
+    ui/devicetile.cpp
+    ui/devicedashboard.h
+    ui/devicedashboard.cpp
     render/qyuvopenglwidget.h
     render/qyuvopenglwidget.cpp
 )

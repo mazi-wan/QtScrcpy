@@ -12,6 +12,7 @@
 
 #include "../groupcontroller/groupcontroller.h"
 #include "config.h"
+#include "devicedashboard.h"
 #include "dialog.h"
 #include "ui_dialog.h"
 #include "videoform.h"
@@ -236,6 +237,19 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
 
     connect(&qsc::IDeviceManage::getInstance(), &qsc::IDeviceManage::deviceConnected, this, &Dialog::onDeviceConnected);
     connect(&qsc::IDeviceManage::getInstance(), &qsc::IDeviceManage::deviceDisconnected, this, &Dialog::onDeviceDisconnected);
+
+    // Create the device dashboard and add it to the main horizontal layout
+    m_dashboard = new DeviceDashboard(this);
+    // The main layout is horizontalLayout_11; append dashboard after leftWidget
+    auto *mainLayout = qobject_cast<QHBoxLayout *>(layout());
+    if (mainLayout) {
+        mainLayout->addWidget(m_dashboard, 1);  // stretch factor 1
+    }
+
+    connect(&qsc::IDeviceManage::getInstance(), &qsc::IDeviceManage::deviceConnected,
+            m_dashboard, &DeviceDashboard::onDeviceConnected);
+    connect(&qsc::IDeviceManage::getInstance(), &qsc::IDeviceManage::deviceDisconnected,
+            m_dashboard, &DeviceDashboard::onDeviceDisconnected);
 }
 
 Dialog::~Dialog()
@@ -632,66 +646,19 @@ void Dialog::getIPbyIp()
 
 void Dialog::onDeviceConnected(bool success, const QString &serial, const QString &deviceName, const QSize &size)
 {
-    Q_UNUSED(deviceName);
+    Q_UNUSED(deviceName)
+    Q_UNUSED(size)
     if (!success) {
+        outLog(tr("Failed to connect device: %1").arg(serial));
         return;
     }
-    auto videoForm = new VideoForm(ui->framelessCheck->isChecked(), Config::getInstance().getSkin(), ui->showToolbar->isChecked());
-    videoForm->setSerial(serial);
-
-    qsc::IDeviceManage::getInstance().getDevice(serial)->setUserData(static_cast<void *>(videoForm));
-    qsc::IDeviceManage::getInstance().getDevice(serial)->registerDeviceObserver(videoForm);
-
-    videoForm->showFPS(ui->fpsCheck->isChecked());
-
-    if (ui->alwaysTopCheck->isChecked()) {
-        videoForm->staysOnTop();
-    }
-
-#ifndef Q_OS_WIN32
-    // must be show before updateShowSize
-    videoForm->show();
-#endif
-    // QString name = Config::getInstance().getNickName(serial);
-    // if (name.isEmpty()) {
-    //     name = getDeviceDisplayName(serial);
-    // }
-    QString name = getDeviceDisplayName(serial);
-    videoForm->setWindowTitle(name);
-    videoForm->updateShowSize(size);
-
-    bool deviceVer = size.height() > size.width();
-    QRect rc = Config::getInstance().getRect(serial);
-    bool rcVer = rc.height() > rc.width();
-    // same width/height rate
-    if (rc.isValid() && (deviceVer == rcVer)) {
-        // mark: resize is for fix setGeometry magneticwidget bug
-        videoForm->resize(rc.size());
-        videoForm->setGeometry(rc);
-    }
-
-#ifdef Q_OS_WIN32
-    // windows是show太早可以看到resize的过程
-    QTimer::singleShot(200, videoForm, [videoForm]() { videoForm->show(); });
-#endif
-
-    GroupController::instance().addDevice(serial);
+    outLog(tr("Device connected: %1").arg(serial));
 }
 
 void Dialog::onDeviceDisconnected(QString serial)
 {
     GroupController::instance().removeDevice(serial);
-    auto device = qsc::IDeviceManage::getInstance().getDevice(serial);
-    if (!device) {
-        return;
-    }
-    auto data = device->getUserData();
-    if (data) {
-        VideoForm *vf = static_cast<VideoForm *>(data);
-        qsc::IDeviceManage::getInstance().getDevice(serial)->deRegisterDeviceObserver(vf);
-        vf->close();
-        vf->deleteLater();
-    }
+    outLog(tr("Device disconnected: %1").arg(serial));
 }
 
 void Dialog::onDeviceInfoUpdated(const qsc::DeviceInfo &info)
