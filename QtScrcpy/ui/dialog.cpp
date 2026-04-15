@@ -297,7 +297,10 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
 
     m_panelContainer = panelWidget;
 
-    int panelW = 340;
+    // Use leftWidget's natural preferred width so content fits without clipping.
+    // sizeHint() is valid here because setupUi() has already laid out all children.
+    int panelW = ui->leftWidget->sizeHint().width();
+    if (panelW < 200) panelW = 320;   // safety floor
     m_panelContainer->resize(panelW, height());
     m_panelContainer->move(-panelW, 0);
     m_panelContainer->show();
