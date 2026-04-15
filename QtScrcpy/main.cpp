@@ -10,6 +10,7 @@
 #include <QTcpSocket>
 #include <QTranslator>
 #include <QDateTime>
+#include <cstdio>
 
 #include "config.h"
 #include "dialog.h"
@@ -25,6 +26,17 @@ QtMsgType covertLogLevel(const QString &logLevel);
 
 int main(int argc, char *argv[])
 {
+    qInstallMessageHandler([](QtMsgType type, const QMessageLogContext &ctx, const QString &msg) {
+        Q_UNUSED(ctx)
+        const char *level = "DEBUG";
+        if (type == QtWarningMsg)  level = "WARN ";
+        if (type == QtCriticalMsg) level = "ERROR";
+        if (type == QtFatalMsg)    level = "FATAL";
+        fprintf(stdout, "[%s] %s\n", level, msg.toLocal8Bit().constData());
+        fflush(stdout);
+        if (type == QtFatalMsg) abort();
+    });
+
     // set env
 #ifdef Q_OS_WIN32
     qputenv("QTSCRCPY_ADB_PATH", "../../../QtScrcpy/QtScrcpyCore/src/third_party/adb/win/adb.exe");
