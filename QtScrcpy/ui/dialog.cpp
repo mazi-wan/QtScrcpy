@@ -256,8 +256,7 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
         mainLayout->addWidget(m_dashboard, 1);
     }
 
-    // Create the panel overlay container
-    ui->leftWidget->setAutoFillBackground(true);
+    static const char *PANEL_BG = "#E8ECF0";
 
     // Fixed header with action buttons at top (always visible, not scrollable)
     auto *panelHeader = new QWidget(this);
@@ -276,6 +275,19 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
     ui->stopAllServerBtn->hide();
     ui->restartAllBtn->hide();
 
+    // leftWidget: panel background cascades to all children; input widgets get white backgrounds.
+    ui->leftWidget->setStyleSheet(QString(
+        "QWidget          { background-color: %1; color: #1E293B; }"
+        "QGroupBox        { color: #0F172A; font-weight: bold; }"
+        "QLabel           { background: transparent; color: #334155; }"
+        "QCheckBox        { background: transparent; color: #1E293B; }"
+        "QLineEdit        { background-color: #FFFFFF; color: #0F172A; border: 1px solid #B0BEC5; border-radius: 3px; padding: 2px 4px; }"
+        "QTextEdit        { background-color: #FFFFFF; color: #0F172A; border: 1px solid #B0BEC5; }"
+        "QListWidget      { background-color: #FFFFFF; color: #0F172A; border: 1px solid #B0BEC5; }"
+        "QListWidget::item:selected { background-color: #3B82F6; color: #FFFFFF; }"
+        "QComboBox        { background-color: #FFFFFF; color: #0F172A; border: 1px solid #B0BEC5; border-radius: 3px; padding: 2px 4px; }"
+    ).arg(PANEL_BG));
+
     // Scrollable content area
     auto *panelScroll = new QScrollArea();
     panelScroll->setWidget(ui->leftWidget);
@@ -283,12 +295,16 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
     panelScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     panelScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     panelScroll->setFrameShape(QFrame::NoFrame);
+    panelScroll->setStyleSheet(QString("QScrollArea { background-color: %1; border: none; }").arg(PANEL_BG));
+    panelScroll->viewport()->setAutoFillBackground(true);
+    panelScroll->viewport()->setStyleSheet(QString("background-color: %1;").arg(PANEL_BG));
 
-    // Outer container: stacks header + scroll area vertically
+    // Outer container: WA_StyledBackground is required for stylesheet to paint on a plain QWidget
     auto *panelWidget = new QWidget(this);
-    panelWidget->setObjectName("panelContainer");
-    panelWidget->setStyleSheet("QWidget#panelContainer { background-color: #E8ECF0; }"
-                               "QScrollArea { background-color: #E8ECF0; }");
+    panelWidget->setAttribute(Qt::WA_StyledBackground, true);
+    panelWidget->setStyleSheet(QString("background-color: %1;").arg(PANEL_BG));
+    panelHeader->setAttribute(Qt::WA_StyledBackground, true);
+    panelHeader->setStyleSheet(QString("background-color: %1;").arg(PANEL_BG));
     auto *panelLayout = new QVBoxLayout(panelWidget);
     panelLayout->setContentsMargins(0, 0, 0, 0);
     panelLayout->setSpacing(0);
