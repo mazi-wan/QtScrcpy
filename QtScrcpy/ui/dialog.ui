@@ -158,11 +158,6 @@
              </widget>
             </item>
             <item>
-             <widget class="QPushButton" name="deselectAllDevicesBtn">
-              <property name="text"><string>None</string></property>
-             </widget>
-            </item>
-            <item>
              <widget class="QPushButton" name="connectCheckedBtn">
               <property name="text"><string>Connect Checked</string></property>
              </widget>

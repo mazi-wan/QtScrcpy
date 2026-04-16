@@ -86,7 +86,6 @@ private slots:
     void showIpEditMenu(const QPoint &pos);
 
     void on_selectAllDevicesBtn_clicked();
-    void on_deselectAllDevicesBtn_clicked();
     void on_connectCheckedBtn_clicked();
     void onDeviceItemChanged(QListWidgetItem *item);
 
@@ -112,6 +111,7 @@ private:
     void showPortEditMenu(const QPoint &pos);
     void applyCheckStateToItem(QListWidgetItem *item, const QString &serial);
     void connectSerial(const QString &serial);  // build DeviceParams and connect one device
+    void updateToggleAllBtn();
 
 protected:
     void closeEvent(QCloseEvent *event) override;

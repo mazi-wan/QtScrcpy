@@ -140,6 +140,7 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
                     ui->connectedPhoneList->addItem(item);
                     applyCheckStateToItem(item, sortedDevice.second);
                 }
+                updateToggleAllBtn();
 
                 // Trigger async fetch for each device to get detailed properties
                 for (const auto &device : devices) {
@@ -194,6 +195,7 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
                     ui->connectedPhoneList->addItem(item);
                     applyCheckStateToItem(item, sortedDevice.second);
                 }
+                updateToggleAllBtn();
 
                 // Reset progress flag after lightweight device update
                 m_deviceUpdateInProgress = false;
@@ -924,16 +926,34 @@ void Dialog::applyCheckStateToItem(QListWidgetItem *item, const QString &serial)
 
 void Dialog::on_selectAllDevicesBtn_clicked()
 {
+    bool allChecked = true;
     for (int i = 0; i < ui->connectedPhoneList->count(); ++i) {
-        ui->connectedPhoneList->item(i)->setCheckState(Qt::Checked);
+        if (ui->connectedPhoneList->item(i)->checkState() != Qt::Checked) {
+            allChecked = false;
+            break;
+        }
+    }
+    Qt::CheckState newState = allChecked ? Qt::Unchecked : Qt::Checked;
+    for (int i = 0; i < ui->connectedPhoneList->count(); ++i) {
+        ui->connectedPhoneList->item(i)->setCheckState(newState);
     }
 }
 
-void Dialog::on_deselectAllDevicesBtn_clicked()
+void Dialog::updateToggleAllBtn()
 {
-    for (int i = 0; i < ui->connectedPhoneList->count(); ++i) {
-        ui->connectedPhoneList->item(i)->setCheckState(Qt::Unchecked);
+    int total = ui->connectedPhoneList->count();
+    if (total == 0) {
+        ui->selectAllDevicesBtn->setText(tr("All"));
+        return;
     }
+    bool allChecked = true;
+    for (int i = 0; i < total; ++i) {
+        if (ui->connectedPhoneList->item(i)->checkState() != Qt::Checked) {
+            allChecked = false;
+            break;
+        }
+    }
+    ui->selectAllDevicesBtn->setText(allChecked ? tr("None") : tr("All"));
 }
 
 void Dialog::on_connectCheckedBtn_clicked()
@@ -970,6 +990,7 @@ void Dialog::onDeviceItemChanged(QListWidgetItem *item)
         }
     }
     Config::getInstance().setCheckedDevices(checked);
+    updateToggleAllBtn();
     Q_UNUSED(item)
 }
 
