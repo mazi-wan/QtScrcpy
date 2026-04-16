@@ -333,6 +333,13 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
     m_toggleBtn->raise();
     m_toggleBtn->show();
 
+    // Restore panel open state from last session (no animation on startup)
+    if (Config::getInstance().getPanelOpen()) {
+        m_panelOpen = true;
+        m_panelContainer->move(0, 0);
+        m_toggleBtn->setText("◀");
+    }
+
     // Slide animation on the container's pos property
     m_panelAnim = new QPropertyAnimation(m_panelContainer, "pos", this);
     m_panelAnim->setDuration(200);
@@ -346,12 +353,14 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
             m_panelAnim->setStartValue(currentPos);
             m_panelAnim->setEndValue(QPoint(0, 0));
             m_panelOpen = true;
+            Config::getInstance().setPanelOpen(true);
             m_toggleBtn->setText("◀");
         } else {
             m_panelAnim->setEasingCurve(QEasingCurve::InCubic);
             m_panelAnim->setStartValue(currentPos);
             m_panelAnim->setEndValue(QPoint(-panelWidth, 0));
             m_panelOpen = false;
+            Config::getInstance().setPanelOpen(false);
             m_toggleBtn->setText("▶");
         }
         m_panelAnim->start();

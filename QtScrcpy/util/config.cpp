@@ -103,6 +103,7 @@
 #define COMMON_SHOW_TOOLBAR_DEF true
 
 #define COMMON_CHECKED_DEVICES_KEY  "CheckedDevices"
+#define COMMON_LEFT_PANEL_OPEN_KEY  "LeftPanelOpen"
 
 // device config
 #define SERIAL_WINDOW_RECT_KEY_X "WindowRectX"
@@ -251,6 +252,22 @@ void Config::setCheckedDevices(const QStringList &serials)
 {
     m_userData->beginGroup(GROUP_COMMON);
     m_userData->setValue(COMMON_CHECKED_DEVICES_KEY, serials);
+    m_userData->endGroup();
+    m_userData->sync();
+}
+
+bool Config::getPanelOpen()
+{
+    m_userData->beginGroup(GROUP_COMMON);
+    bool open = m_userData->value(COMMON_LEFT_PANEL_OPEN_KEY, false).toBool();
+    m_userData->endGroup();
+    return open;
+}
+
+void Config::setPanelOpen(bool open)
+{
+    m_userData->beginGroup(GROUP_COMMON);
+    m_userData->setValue(COMMON_LEFT_PANEL_OPEN_KEY, open);
     m_userData->endGroup();
     m_userData->sync();
 }

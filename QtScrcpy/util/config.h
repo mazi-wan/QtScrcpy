@@ -55,6 +55,8 @@ public:
     bool getTrayMessageShown();
     QStringList getCheckedDevices();
     void setCheckedDevices(const QStringList &serials);
+    bool getPanelOpen();
+    void setPanelOpen(bool open);
 
     // user data:device
     void setNickName(const QString &serial, const QString &name);
