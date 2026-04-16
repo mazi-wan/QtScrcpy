@@ -265,11 +265,12 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
     headerLayout->setContentsMargins(4, 4, 4, 4);
     headerLayout->setSpacing(4);
     auto *stopAllTopBtn = new QPushButton(tr("Stop All"), panelHeader);
-    auto *restartAllTopBtn = new QPushButton(tr("Restart All"), panelHeader);
+    stopAllTopBtn->setStyleSheet(
+        "QPushButton { background-color: #F97316; color: #FFFFFF; border-radius: 3px; padding: 2px 6px; }"
+        "QPushButton:hover { background-color: #EA6C0A; }"
+        "QPushButton:pressed { background-color: #C2560A; }");
     headerLayout->addWidget(stopAllTopBtn);
-    headerLayout->addWidget(restartAllTopBtn);
     connect(stopAllTopBtn, &QPushButton::clicked, this, &Dialog::on_stopAllServerBtn_clicked);
-    connect(restartAllTopBtn, &QPushButton::clicked, this, &Dialog::on_restartAllBtn_clicked);
 
     // Hide the duplicate buttons inside the scrollable leftWidget
     ui->stopAllServerBtn->hide();
