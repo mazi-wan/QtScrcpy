@@ -325,14 +325,14 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
     m_panelContainer->show();
     m_panelContainer->raise();
 
-    // Fixed toggle button at the left edge of the dialog
-    m_toggleBtn = new QPushButton("▶", this);
+    // Toggle button sits at the right edge of the panel container — moves with it
+    m_toggleBtn = new QPushButton("▶", m_panelContainer);
     m_toggleBtn->setFixedSize(18, 30);
     m_toggleBtn->setToolTip(tr("Toggle panel"));
     m_toggleBtn->setStyleSheet(
         "QPushButton { border: none; background: palette(mid); font-size: 10px; }"
         "QPushButton:hover { background: palette(midlight); }");
-    m_toggleBtn->move(0, height() / 2 - 15);
+    m_toggleBtn->move(panelW, height() / 2 - 15);
     m_toggleBtn->raise();
     m_toggleBtn->show();
 
@@ -578,7 +578,7 @@ void Dialog::resizeEvent(QResizeEvent *event)
         }
     }
     if (m_toggleBtn) {
-        m_toggleBtn->move(0, event->size().height() / 2 - 15);
+        m_toggleBtn->move(m_panelContainer->width(), event->size().height() / 2 - 15);
     }
 }
 
