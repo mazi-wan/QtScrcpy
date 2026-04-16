@@ -541,6 +541,14 @@ void VideoForm::onFrame(int width, int height, uint8_t *dataY, uint8_t *dataU, u
     updateRender(width, height, dataY, dataU, dataV, linesizeY, linesizeU, linesizeV);
 }
 
+void VideoForm::reinitVideoWidget()
+{
+    if (m_videoWidget && !m_videoWidget->isHidden()) {
+        m_videoWidget->hide();
+        m_videoWidget->show();
+    }
+}
+
 void VideoForm::staysOnTop(bool top)
 {
     bool needShow = false;

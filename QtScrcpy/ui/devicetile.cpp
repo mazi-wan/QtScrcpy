@@ -90,6 +90,7 @@ void DeviceTile::detach()
     m_videoForm->installEventFilter(this);
     m_videoForm->setParent(nullptr);   // become top-level window
     m_videoForm->show();
+    m_videoForm->reinitVideoWidget();
     m_placeholder->show();
     m_popOutBtn->setEnabled(false);
 }
@@ -107,6 +108,7 @@ void DeviceTile::attach()
     m_videoLayout->insertWidget(0, m_videoForm);
     m_videoForm->setFocusPolicy(Qt::StrongFocus);
     m_videoForm->show();
+    m_videoForm->reinitVideoWidget();
 }
 
 bool DeviceTile::isDetached() const

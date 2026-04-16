@@ -31,6 +31,7 @@ public:
     void resizeSquare();
     void removeBlackRect();
     void showFPS(bool show);
+    void reinitVideoWidget();
     void switchFullScreen();
     bool isHost();
 
