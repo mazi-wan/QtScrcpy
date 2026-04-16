@@ -543,6 +543,8 @@ void VideoForm::onFrame(int width, int height, uint8_t *dataY, uint8_t *dataU, u
 
 void VideoForm::reinitVideoWidget()
 {
+    // setParent() destroys the native window, invalidating the QOpenGLWidget's GL context.
+    // Hide + show forces Qt to call initializeGL() for the new context before the next frame upload.
     if (m_videoWidget && !m_videoWidget->isHidden()) {
         m_videoWidget->hide();
         m_videoWidget->show();
