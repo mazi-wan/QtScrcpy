@@ -133,13 +133,16 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
                     return a.first < b.first;
                 });
 
-                // Add sorted devices to UI
+                // Add sorted devices to UI — block signals to prevent itemChanged from
+                // overwriting Config with a partial list while the list is being built.
+                ui->connectedPhoneList->blockSignals(true);
                 for (const auto &sortedDevice : sortedDevices) {
                     ui->serialBox->addItem(sortedDevice.second);
                     auto *item = new QListWidgetItem(sortedDevice.first);
                     ui->connectedPhoneList->addItem(item);
                     applyCheckStateToItem(item, sortedDevice.second);
                 }
+                ui->connectedPhoneList->blockSignals(false);
                 updateToggleAllBtn();
 
                 // Trigger async fetch for each device to get detailed properties
@@ -188,13 +191,16 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
                     return a.first < b.first;
                 });
 
-                // Add sorted devices to UI
+                // Add sorted devices to UI — block signals to prevent itemChanged from
+                // overwriting Config with a partial list while the list is being built.
+                ui->connectedPhoneList->blockSignals(true);
                 for (const auto &sortedDevice : sortedDevices) {
                     ui->serialBox->addItem(sortedDevice.second);
                     auto *item = new QListWidgetItem(sortedDevice.first);
                     ui->connectedPhoneList->addItem(item);
                     applyCheckStateToItem(item, sortedDevice.second);
                 }
+                ui->connectedPhoneList->blockSignals(false);
                 updateToggleAllBtn();
 
                 // Reset progress flag after lightweight device update
@@ -325,14 +331,17 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
     m_panelContainer->show();
     m_panelContainer->raise();
 
-    // Toggle button sits at the right edge of the panel container — moves with it
-    m_toggleBtn = new QPushButton("▶", m_panelContainer);
+    // Toggle button: child of dialog, tracks the right edge of the panel container.
+    // Qt clips children to parent bounds, so the button must be a child of the dialog
+    // (not the container). We update its x via the animation's valueChanged signal.
+    m_toggleBtn = new QPushButton("▶", this);
     m_toggleBtn->setFixedSize(18, 30);
     m_toggleBtn->setToolTip(tr("Toggle panel"));
     m_toggleBtn->setStyleSheet(
         "QPushButton { border: none; background: palette(mid); font-size: 10px; }"
         "QPushButton:hover { background: palette(midlight); }");
-    m_toggleBtn->move(panelW, height() / 2 - 15);
+    // Initially panel is closed: container at x=-panelW, so right edge is at x=0
+    m_toggleBtn->move(0, height() / 2 - 15);
     m_toggleBtn->raise();
     m_toggleBtn->show();
 
@@ -341,11 +350,20 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
         m_panelOpen = true;
         m_panelContainer->move(0, 0);
         m_toggleBtn->setText("◀");
+        m_toggleBtn->move(panelW, height() / 2 - 15);
     }
 
     // Slide animation on the container's pos property
     m_panelAnim = new QPropertyAnimation(m_panelContainer, "pos", this);
     m_panelAnim->setDuration(200);
+
+    // Keep the toggle button aligned with the panel's right edge during animation
+    connect(m_panelAnim, &QPropertyAnimation::valueChanged, this, [this](const QVariant &val) {
+        if (m_toggleBtn && m_panelContainer) {
+            int panelRight = val.toPoint().x() + m_panelContainer->width();
+            m_toggleBtn->move(panelRight, m_toggleBtn->y());
+        }
+    });
 
     connect(m_toggleBtn, &QPushButton::clicked, this, [this]() {
         m_panelAnim->stop();
@@ -577,8 +595,9 @@ void Dialog::resizeEvent(QResizeEvent *event)
             m_panelContainer->move(-m_panelContainer->width(), 0);
         }
     }
-    if (m_toggleBtn) {
-        m_toggleBtn->move(m_panelContainer->width(), event->size().height() / 2 - 15);
+    if (m_toggleBtn && m_panelContainer) {
+        int panelRight = m_panelContainer->pos().x() + m_panelContainer->width();
+        m_toggleBtn->move(panelRight, event->size().height() / 2 - 15);
     }
 }
 
