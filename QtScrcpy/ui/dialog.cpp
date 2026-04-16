@@ -907,9 +907,9 @@ void Dialog::on_restartAllBtn_clicked()
 void Dialog::applyCheckStateToItem(QListWidgetItem *item, const QString &serial)
 {
     item->setFlags(item->flags() | Qt::ItemIsUserCheckable);
+    item->setData(Qt::UserRole, serial);  // set serial BEFORE setCheckState fires itemChanged
     QStringList checked = Config::getInstance().getCheckedDevices();
     item->setCheckState(checked.contains(serial) ? Qt::Checked : Qt::Unchecked);
-    item->setData(Qt::UserRole, serial);  // store serial for later lookup
 }
 
 void Dialog::on_selectAllDevicesBtn_clicked()
