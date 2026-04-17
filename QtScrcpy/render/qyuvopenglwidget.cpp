@@ -99,7 +99,7 @@ QYUVOpenGLWidget::QYUVOpenGLWidget(QWidget *parent) : QOpenGLWidget(parent)
 QYUVOpenGLWidget::~QYUVOpenGLWidget()
 {
     makeCurrent();
-    delete m_shaderProgram;
+    delete m_shaderProgram;     // ~QOpenGLShaderProgram calls glDeleteProgram; context must be current
     m_shaderProgram = nullptr;
     m_vbo.destroy();
     deInitTextures();
@@ -172,6 +172,8 @@ void QYUVOpenGLWidget::initializeGL()
 
 void QYUVOpenGLWidget::paintGL()
 {
+    if (!m_shaderProgram)
+        return;
     m_shaderProgram->bind();
 
     if (m_needUpdate) {

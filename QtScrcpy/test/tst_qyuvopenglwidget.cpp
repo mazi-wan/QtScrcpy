@@ -107,10 +107,10 @@ void TstQYUVOpenGLWidget::initializeGL_shaderIsLinkedAfterReinit()
     QApplication::processEvents(); // first initializeGL() + paintGL()
 
     QVERIFY(w.isShaderLinked());
-    const QOpenGLShaderProgram *before = w.shaderProgram();
+    const void *beforeAddr = static_cast<const void *>(w.shaderProgram());
     w.callInitializeGL();
     QVERIFY(w.isShaderLinked());
-    QVERIFY(w.shaderProgram() != before);  // must be a fresh instance
+    QVERIFY(static_cast<const void *>(w.shaderProgram()) != beforeAddr);  // must be a fresh instance
 }
 
 QTEST_MAIN(TstQYUVOpenGLWidget)
