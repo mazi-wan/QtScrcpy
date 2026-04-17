@@ -144,7 +144,10 @@ void QYUVOpenGLWidget::initializeGL()
     initializeOpenGLFunctions();
     glDisable(GL_DEPTH_TEST);
 
-    // 顶点缓冲对象初始化
+    // Destroy stale VBO handle before recreating — the old handle is invalid after context recreation.
+    if (m_vbo.isCreated()) {
+        m_vbo.destroy();
+    }
     m_vbo.create();
     m_vbo.bind();
     m_vbo.allocate(coordinate, sizeof(coordinate));
@@ -196,15 +199,19 @@ void QYUVOpenGLWidget::resizeGL(int width, int height)
 
 void QYUVOpenGLWidget::initShader()
 {
-    // opengles的float、int等要手动指定精度
+    // Clear any shaders from a previous context — prevents duplicate-shader link failure on reinit.
+    m_shaderProgram.removeAllShaders();
+
+    // Use a local copy so the static source string is never mutated between calls.
+    QString fragShader = s_fragShader;
     if (QCoreApplication::testAttribute(Qt::AA_UseOpenGLES)) {
-        s_fragShader.prepend(R"(
+        fragShader.prepend(R"(
                              precision mediump int;
                              precision mediump float;
                              )");
     }
     m_shaderProgram.addShaderFromSourceCode(QOpenGLShader::Vertex, s_vertShader);
-    m_shaderProgram.addShaderFromSourceCode(QOpenGLShader::Fragment, s_fragShader);
+    m_shaderProgram.addShaderFromSourceCode(QOpenGLShader::Fragment, fragShader);
     m_shaderProgram.link();
     m_shaderProgram.bind();
 

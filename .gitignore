@@ -24,3 +24,7 @@ CMakeCache.txt
 compile_commands.json
 .cache
 *.log
+CTestTestfile.cmake
+*_autogen/
+build_test_check/
+QtScrcpy/test/tst_*
