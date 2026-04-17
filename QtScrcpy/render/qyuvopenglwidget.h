@@ -26,10 +26,10 @@ protected:
     void paintGL() override;
     void resizeGL(int width, int height) override;
 
-    // 视频帧尺寸
     QSize m_frameSize = { -1, -1 };
     bool m_needUpdate = false;
     bool m_textureInited = false;
+    QOpenGLShaderProgram m_shaderProgram;
 
 private:
     void initShader();
@@ -37,13 +37,7 @@ private:
     void deInitTextures();
     void updateTexture(GLuint texture, quint32 textureType, quint8 *pixels, quint32 stride);
 
-    // 顶点缓冲对象(Vertex Buffer Objects, VBO)：默认即为VertexBuffer(GL_ARRAY_BUFFER)类型
     QOpenGLBuffer m_vbo;
-
-    // 着色器程序：编译链接着色器
-    QOpenGLShaderProgram m_shaderProgram;
-
-    // YUV纹理，用于生成纹理贴图
     GLuint m_texture[3] = { 0 };
 };
 
