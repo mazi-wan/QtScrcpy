@@ -400,3 +400,6 @@ target_link_libraries(${PROJECT_NAME} PRIVATE
 )
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+enable_testing()
+add_subdirectory(test)
