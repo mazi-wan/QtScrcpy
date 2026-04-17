@@ -345,13 +345,11 @@ Dialog::Dialog(QWidget *parent) : QWidget(parent), ui(new Ui::Widget)
     m_toggleBtn->raise();
     m_toggleBtn->show();
 
-    // Restore panel open state from last session (no animation on startup)
-    if (Config::getInstance().getPanelOpen()) {
-        m_panelOpen = true;
-        m_panelContainer->move(0, 0);
-        m_toggleBtn->setText("◀");
-        m_toggleBtn->move(panelW, height() / 2 - 15);
-    }
+    // Panel always starts open
+    m_panelOpen = true;
+    m_panelContainer->move(0, 0);
+    m_toggleBtn->setText("◀");
+    m_toggleBtn->move(panelW, height() / 2 - 15);
 
     // Slide animation on the container's pos property
     m_panelAnim = new QPropertyAnimation(m_panelContainer, "pos", this);
