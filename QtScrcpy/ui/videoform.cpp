@@ -192,7 +192,7 @@ void VideoForm::installShortcut()
     QShortcut *shortcut = nullptr;
 
     // switchFullScreen
-    shortcut = new QShortcut(QKeySequence("Ctrl+f"), this);
+    shortcut = new QShortcut(QKeySequence("Ctrl+f"), this, nullptr, nullptr, Qt::WidgetWithChildrenShortcut);
     shortcut->setAutoRepeat(false);
     connect(shortcut, &QShortcut::activated, this, [this]() {
         auto device = qsc::IDeviceManage::getInstance().getDevice(m_serial);
@@ -203,17 +203,17 @@ void VideoForm::installShortcut()
     });
 
     // resizeSquare
-    shortcut = new QShortcut(QKeySequence("Ctrl+g"), this);
+    shortcut = new QShortcut(QKeySequence("Ctrl+g"), this, nullptr, nullptr, Qt::WidgetWithChildrenShortcut);
     shortcut->setAutoRepeat(false);
     connect(shortcut, &QShortcut::activated, this, [this]() { resizeSquare(); });
 
     // removeBlackRect
-    shortcut = new QShortcut(QKeySequence("Ctrl+w"), this);
+    shortcut = new QShortcut(QKeySequence("Ctrl+w"), this, nullptr, nullptr, Qt::WidgetWithChildrenShortcut);
     shortcut->setAutoRepeat(false);
     connect(shortcut, &QShortcut::activated, this, [this]() { removeBlackRect(); });
 
     // postGoHome
-    shortcut = new QShortcut(QKeySequence("Ctrl+h"), this);
+    shortcut = new QShortcut(QKeySequence("Ctrl+h"), this, nullptr, nullptr, Qt::WidgetWithChildrenShortcut);
     shortcut->setAutoRepeat(false);
     connect(shortcut, &QShortcut::activated, this, [this]() {
         auto device = qsc::IDeviceManage::getInstance().getDevice(m_serial);
@@ -224,7 +224,7 @@ void VideoForm::installShortcut()
     });
 
     // postGoBack
-    shortcut = new QShortcut(QKeySequence("Ctrl+b"), this);
+    shortcut = new QShortcut(QKeySequence("Ctrl+b"), this, nullptr, nullptr, Qt::WidgetWithChildrenShortcut);
     shortcut->setAutoRepeat(false);
     connect(shortcut, &QShortcut::activated, this, [this]() {
         auto device = qsc::IDeviceManage::getInstance().getDevice(m_serial);
@@ -235,7 +235,7 @@ void VideoForm::installShortcut()
     });
 
     // postAppSwitch
-    shortcut = new QShortcut(QKeySequence("Ctrl+s"), this);
+    shortcut = new QShortcut(QKeySequence("Ctrl+s"), this, nullptr, nullptr, Qt::WidgetWithChildrenShortcut);
     shortcut->setAutoRepeat(false);
     connect(shortcut, &QShortcut::activated, this, [this]() {
         auto device = qsc::IDeviceManage::getInstance().getDevice(m_serial);
@@ -246,7 +246,7 @@ void VideoForm::installShortcut()
     });
 
     // postGoMenu
-    shortcut = new QShortcut(QKeySequence("Ctrl+m"), this);
+    shortcut = new QShortcut(QKeySequence("Ctrl+m"), this, nullptr, nullptr, Qt::WidgetWithChildrenShortcut);
     shortcut->setAutoRepeat(false);
     connect(shortcut, &QShortcut::activated, this, [this]() {
         auto device = qsc::IDeviceManage::getInstance().getDevice(m_serial);
@@ -257,7 +257,7 @@ void VideoForm::installShortcut()
     });
 
     // postVolumeUp
-    shortcut = new QShortcut(QKeySequence("Ctrl+up"), this);
+    shortcut = new QShortcut(QKeySequence("Ctrl+up"), this, nullptr, nullptr, Qt::WidgetWithChildrenShortcut);
     connect(shortcut, &QShortcut::activated, this, [this]() {
         auto device = qsc::IDeviceManage::getInstance().getDevice(m_serial);
         if (!device) {
@@ -267,7 +267,7 @@ void VideoForm::installShortcut()
     });
 
     // postVolumeDown
-    shortcut = new QShortcut(QKeySequence("Ctrl+down"), this);
+    shortcut = new QShortcut(QKeySequence("Ctrl+down"), this, nullptr, nullptr, Qt::WidgetWithChildrenShortcut);
     connect(shortcut, &QShortcut::activated, this, [this]() {
         auto device = qsc::IDeviceManage::getInstance().getDevice(m_serial);
         if (!device) {
@@ -277,7 +277,7 @@ void VideoForm::installShortcut()
     });
 
     // postPower
-    shortcut = new QShortcut(QKeySequence("Ctrl+p"), this);
+    shortcut = new QShortcut(QKeySequence("Ctrl+p"), this, nullptr, nullptr, Qt::WidgetWithChildrenShortcut);
     shortcut->setAutoRepeat(false);
     connect(shortcut, &QShortcut::activated, this, [this]() {
         auto device = qsc::IDeviceManage::getInstance().getDevice(m_serial);
@@ -287,7 +287,7 @@ void VideoForm::installShortcut()
         emit device->postPower();
     });
 
-    shortcut = new QShortcut(QKeySequence("Ctrl+o"), this);
+    shortcut = new QShortcut(QKeySequence("Ctrl+o"), this, nullptr, nullptr, Qt::WidgetWithChildrenShortcut);
     shortcut->setAutoRepeat(false);
     connect(shortcut, &QShortcut::activated, this, [this]() {
         auto device = qsc::IDeviceManage::getInstance().getDevice(m_serial);
@@ -298,7 +298,7 @@ void VideoForm::installShortcut()
     });
 
     // expandNotificationPanel
-    shortcut = new QShortcut(QKeySequence("Ctrl+n"), this);
+    shortcut = new QShortcut(QKeySequence("Ctrl+n"), this, nullptr, nullptr, Qt::WidgetWithChildrenShortcut);
     shortcut->setAutoRepeat(false);
     connect(shortcut, &QShortcut::activated, this, [this]() {
         auto device = qsc::IDeviceManage::getInstance().getDevice(m_serial);
@@ -309,7 +309,7 @@ void VideoForm::installShortcut()
     });
 
     // collapsePanel
-    shortcut = new QShortcut(QKeySequence("Ctrl+Shift+n"), this);
+    shortcut = new QShortcut(QKeySequence("Ctrl+Shift+n"), this, nullptr, nullptr, Qt::WidgetWithChildrenShortcut);
     shortcut->setAutoRepeat(false);
     connect(shortcut, &QShortcut::activated, this, [this]() {
         auto device = qsc::IDeviceManage::getInstance().getDevice(m_serial);
@@ -320,7 +320,7 @@ void VideoForm::installShortcut()
     });
 
     // copy
-    shortcut = new QShortcut(QKeySequence("Ctrl+c"), this);
+    shortcut = new QShortcut(QKeySequence("Ctrl+c"), this, nullptr, nullptr, Qt::WidgetWithChildrenShortcut);
     shortcut->setAutoRepeat(false);
     connect(shortcut, &QShortcut::activated, this, [this]() {
         auto device = qsc::IDeviceManage::getInstance().getDevice(m_serial);
@@ -331,7 +331,7 @@ void VideoForm::installShortcut()
     });
 
     // cut
-    shortcut = new QShortcut(QKeySequence("Ctrl+x"), this);
+    shortcut = new QShortcut(QKeySequence("Ctrl+x"), this, nullptr, nullptr, Qt::WidgetWithChildrenShortcut);
     shortcut->setAutoRepeat(false);
     connect(shortcut, &QShortcut::activated, this, [this]() {
         auto device = qsc::IDeviceManage::getInstance().getDevice(m_serial);
@@ -342,7 +342,7 @@ void VideoForm::installShortcut()
     });
 
     // clipboardPaste
-    shortcut = new QShortcut(QKeySequence("Ctrl+v"), this);
+    shortcut = new QShortcut(QKeySequence("Ctrl+v"), this, nullptr, nullptr, Qt::WidgetWithChildrenShortcut);
     shortcut->setAutoRepeat(false);
     connect(shortcut, &QShortcut::activated, this, [this]() {
         auto device = qsc::IDeviceManage::getInstance().getDevice(m_serial);
@@ -353,7 +353,7 @@ void VideoForm::installShortcut()
     });
 
     // setDeviceClipboard
-    shortcut = new QShortcut(QKeySequence("Ctrl+Shift+v"), this);
+    shortcut = new QShortcut(QKeySequence("Ctrl+Shift+v"), this, nullptr, nullptr, Qt::WidgetWithChildrenShortcut);
     shortcut->setAutoRepeat(false);
     connect(shortcut, &QShortcut::activated, this, [this]() {
         auto device = qsc::IDeviceManage::getInstance().getDevice(m_serial);
