@@ -153,6 +153,13 @@ void QYUVOpenGLWidget::initializeGL()
     glClearColor(0.0, 0.0, 0.0, 0.0);
     // 清理颜色背景
     glClear(GL_COLOR_BUFFER_BIT);
+
+    // Reset texture state — context may have been recreated after reparenting (detach/attach).
+    // paintGL() will call initTextures() on the next pass via m_needUpdate.
+    m_textureInited = false;
+    if (m_frameSize.isValid()) {
+        m_needUpdate = true;
+    }
 }
 
 void QYUVOpenGLWidget::paintGL()
