@@ -99,6 +99,8 @@ QYUVOpenGLWidget::QYUVOpenGLWidget(QWidget *parent) : QOpenGLWidget(parent)
 QYUVOpenGLWidget::~QYUVOpenGLWidget()
 {
     makeCurrent();
+    delete m_shaderProgram;
+    m_shaderProgram = nullptr;
     m_vbo.destroy();
     deInitTextures();
     doneCurrent();
@@ -144,6 +146,9 @@ void QYUVOpenGLWidget::initializeGL()
     initializeOpenGLFunctions();
     glDisable(GL_DEPTH_TEST);
 
+    delete m_shaderProgram;
+    m_shaderProgram = new QOpenGLShaderProgram(this);
+
     // Destroy stale VBO handle before recreating — the old handle is invalid after context recreation.
     if (m_vbo.isCreated()) {
         m_vbo.destroy();
@@ -167,7 +172,7 @@ void QYUVOpenGLWidget::initializeGL()
 
 void QYUVOpenGLWidget::paintGL()
 {
-    m_shaderProgram.bind();
+    m_shaderProgram->bind();
 
     if (m_needUpdate) {
         deInitTextures();
@@ -188,7 +193,7 @@ void QYUVOpenGLWidget::paintGL()
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     }
 
-    m_shaderProgram.release();
+    m_shaderProgram->release();
 }
 
 void QYUVOpenGLWidget::resizeGL(int width, int height)
@@ -199,9 +204,6 @@ void QYUVOpenGLWidget::resizeGL(int width, int height)
 
 void QYUVOpenGLWidget::initShader()
 {
-    // Clear any shaders from a previous context — prevents duplicate-shader link failure on reinit.
-    m_shaderProgram.removeAllShaders();
-
     // Use a local copy so the static source string is never mutated between calls.
     QString fragShader = s_fragShader;
     if (QCoreApplication::testAttribute(Qt::AA_UseOpenGLES)) {
@@ -210,26 +212,26 @@ void QYUVOpenGLWidget::initShader()
                              precision mediump float;
                              )");
     }
-    m_shaderProgram.addShaderFromSourceCode(QOpenGLShader::Vertex, s_vertShader);
-    m_shaderProgram.addShaderFromSourceCode(QOpenGLShader::Fragment, fragShader);
-    m_shaderProgram.link();
-    m_shaderProgram.bind();
+    m_shaderProgram->addShaderFromSourceCode(QOpenGLShader::Vertex, s_vertShader);
+    m_shaderProgram->addShaderFromSourceCode(QOpenGLShader::Fragment, fragShader);
+    m_shaderProgram->link();
+    m_shaderProgram->bind();
 
     // 指定顶点坐标在vbo中的访问方式
     // 参数解释：顶点坐标在shader中的参数名称，顶点坐标为float，起始偏移为0，顶点坐标类型为vec3，步幅为3个float
-    m_shaderProgram.setAttributeBuffer("vertexIn", GL_FLOAT, 0, 3, 3 * sizeof(float));
+    m_shaderProgram->setAttributeBuffer("vertexIn", GL_FLOAT, 0, 3, 3 * sizeof(float));
     // 启用顶点属性
-    m_shaderProgram.enableAttributeArray("vertexIn");
+    m_shaderProgram->enableAttributeArray("vertexIn");
 
     // 指定纹理坐标在vbo中的访问方式
     // 参数解释：纹理坐标在shader中的参数名称，纹理坐标为float，起始偏移为12个float（跳过前面存储的12个顶点坐标），纹理坐标类型为vec2，步幅为2个float
-    m_shaderProgram.setAttributeBuffer("textureIn", GL_FLOAT, 12 * sizeof(float), 2, 2 * sizeof(float));
-    m_shaderProgram.enableAttributeArray("textureIn");
+    m_shaderProgram->setAttributeBuffer("textureIn", GL_FLOAT, 12 * sizeof(float), 2, 2 * sizeof(float));
+    m_shaderProgram->enableAttributeArray("textureIn");
 
     // 关联片段着色器中的纹理单元和opengl中的纹理单元（opengl一般提供16个纹理单元）
-    m_shaderProgram.setUniformValue("textureY", 0);
-    m_shaderProgram.setUniformValue("textureU", 1);
-    m_shaderProgram.setUniformValue("textureV", 2);
+    m_shaderProgram->setUniformValue("textureY", 0);
+    m_shaderProgram->setUniformValue("textureU", 1);
+    m_shaderProgram->setUniformValue("textureV", 2);
 }
 
 void QYUVOpenGLWidget::initTextures()

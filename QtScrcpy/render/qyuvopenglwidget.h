@@ -29,7 +29,7 @@ protected:
     QSize m_frameSize = { -1, -1 };
     bool m_needUpdate = false;
     bool m_textureInited = false;
-    QOpenGLShaderProgram m_shaderProgram;
+    QOpenGLShaderProgram *m_shaderProgram = nullptr;
 
 private:
     void initShader();

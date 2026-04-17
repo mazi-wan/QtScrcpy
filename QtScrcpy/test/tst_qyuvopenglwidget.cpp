@@ -11,7 +11,8 @@ public:
 
     bool isTextureInited() const { return m_textureInited; }
     bool isNeedUpdate() const { return m_needUpdate; }
-    bool isShaderLinked() const { return m_shaderProgram.isLinked(); }
+    bool isShaderLinked() const { return m_shaderProgram && m_shaderProgram->isLinked(); }
+    const QOpenGLShaderProgram *shaderProgram() const { return m_shaderProgram; }
 
     void setTextureInited(bool v) { m_textureInited = v; }
     void setNeedUpdate(bool v) { m_needUpdate = v; }
@@ -105,11 +106,11 @@ void TstQYUVOpenGLWidget::initializeGL_shaderIsLinkedAfterReinit()
     w.show();
     QApplication::processEvents(); // first initializeGL() + paintGL()
 
-    // Simulate context recreation after setParent() — Qt calls initializeGL() again
-    w.callInitializeGL();
-
-    // Shader program must be linked — an unlinked program produces a permanent black screen
     QVERIFY(w.isShaderLinked());
+    const QOpenGLShaderProgram *before = w.shaderProgram();
+    w.callInitializeGL();
+    QVERIFY(w.isShaderLinked());
+    QVERIFY(w.shaderProgram() != before);  // must be a fresh instance
 }
 
 QTEST_MAIN(TstQYUVOpenGLWidget)
