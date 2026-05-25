@@ -17,7 +17,7 @@ jobs:
     runs-on: ${{ matrix.runs-on }}
     strategy:
       matrix:
-        # 【核心修改】：只保留 5.15.2，移除了 6.5.3
+        # 只保留最稳定的 Qt5 构建
         qt-ver: [5.15.2]        
         include:
           - qt-ver: 5.15.2
@@ -29,14 +29,14 @@ jobs:
       qt-install-path: ${{ github.workspace }}/${{ matrix.qt-ver }}
       plantform-des: mac
     steps:
-      # 1. 优先检出代码（升级至 v4），确保完整 tag 和子模块被正确拉取
+      # 1. 检出源码（升级至 v4）
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           submodules: 'true'
           ssh-key: ${{ secrets.BOT_SSH_KEY }}
 
-      # 2. 缓存 Qt
+      # 2. 缓存管理
       - name: Cache Qt
         id: cache-qt
         uses: actions/cache@v4
@@ -44,7 +44,7 @@ jobs:
           path: ${{ env.qt-install-path }}/${{ matrix.qt-arch-install }}
           key: ${{ runner.os }}/${{ matrix.qt-ver }}/${{ matrix.qt-arch-install }}
 
-      # 3. 安装 Qt5
+      # 3. 安装 Qt5 环境
       - name: Install Qt5
         if: startsWith(matrix.qt-ver, '5.')
         uses: jurplel/install-qt-action@v4.1.1
@@ -52,7 +52,7 @@ jobs:
           version: ${{ matrix.qt-ver }}
           cached: ${{ steps.cache-qt.outputs.cache-hit }}
 
-      # 4. 编译步骤（由于只跑 Qt5，移除了此前针对 Qt6 的所有 sed 补丁）
+      # 4. 执行编译
       - name: Build MacOS
         env:
           ENV_QT_PATH: ${{ env.qt-install-path }}
@@ -61,7 +61,7 @@ jobs:
           python ci/generate-version.py
           ci/mac/build_for_mac.sh RelWithDebInfo ${{ matrix.build-arch }}
 
-      # 5. 获取ref最后一个/后的内容
+      # 5. 获取语义化的 Git 分支/标签版本
       - name: Get the version
         shell: bash
         id: get-version
@@ -69,32 +69,21 @@ jobs:
           VERSION=${GITHUB_REF##*/}
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-      # 6. 打包
+      # 6. 打包阶段（自动修复动态库缺失、依赖注入）
       - name: Package
         id: package
         env:
           ENV_QT_PATH: ${{ env.qt-install-path }}
           publish_name: ${{ env.target-name }}-${{ env.plantform-des }}-${{ matrix.build-arch }}-Qt${{ matrix.qt-ver }}-${{ steps.get-version.outputs.version }}
         run: |
+          # 运行原本的发布脚本（在 ci/build 目录下生成初始的 QtScrcpy.app）
           ci/mac/publish_for_mac.sh ../build ${{ matrix.build-arch }}
-          ci/mac/package_for_mac.sh
-          mv ci/build/QtScrcpy.app ci/build/${{ env.publish_name }}.app
-          mv ci/build/QtScrcpy.dmg ci/build/${{ env.publish_name }}.dmg
-          echo "package-name=${{ env.publish_name }}" >> $GITHUB_OUTPUT
-
-      # 7. 上传 Artifact
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.package.outputs.package-name }}.zip
-          path: ci/build/${{ steps.package.outputs.package-name }}.dmg
-
-      # 8. 自动发布到 Release
-      - name: Upload Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ci/build/${{ steps.package.outputs.package-name }}.dmg
-          asset_name: ${{ steps.package.outputs.package-name }}.dmg
-          tag: ${{ github.ref }}
-          overwrite: true
+          
+          # 【核心修复】：注入 macdeployqt 工具，将所有需要的 Qt Frameworks (包括 QtMultimedia) 复制进 App 内部
+          echo "==== 开始使用 macdeployqt 修复并注入依赖框架 ===="
+          MACDEPLOYQT_BIN="${{ env.qt-install-path }}/${{ matrix.qt-arch-install }}/bin/macdeployqt"
+          
+          # 动态嗅探 .app 所在位置并执行依赖固化操作
+          if [ -d "ci/build/QtScrcpy.app" ]; then
+            "$MACDEPLOYQT_BIN" ci/build/QtScrcpy.app -verbose=2
+          elif
