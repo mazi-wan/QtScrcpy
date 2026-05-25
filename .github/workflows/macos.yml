@@ -67,4 +67,67 @@ jobs:
         uses: jurplel/install-qt-action@v4.1.1
         with:
           version: ${{ matrix.qt-ver }}
-          modules:
+          modules: qtmultimedia
+          cached: ${{ steps.cache-qt.outputs.cache-hit }}
+
+      # 5. 编译步骤（核心拦截点）
+      - name: Build MacOS
+        env:
+          ENV_QT_PATH: ${{ env.qt-install-path }}
+          # 显式告诉 cmake 去哪里找当前矩阵对应的 Qt cmake 配置文件
+          CMAKE_PREFIX_PATH: ${{ env.qt-install-path }}/${{ matrix.qt-arch-install }}/lib/cmake
+        run: |
+          python ci/generate-version.py
+          
+          # 【终极核心修复】：拦截并强行改写 CMakeLists.txt 里的硬编码
+          if [ "${{ matrix.qt-ver }}" = "6.5.3" ]; then
+            echo "==== 检测到当前为 Qt6 构建环境，利用 sed 强行修正 CMakeLists.txt 的硬编码 ===="
+            sed -i '' 's/set(QT_DESIRED_VERSION 5)/set(QT_DESIRED_VERSION 6)/g' QtScrcpy/CMakeLists.txt
+          fi
+          
+          # 注入环境变量，双保险防范内部构建脚本拦截
+          export QT_DESIRED_VERSION=${{ startsWith(matrix.qt-ver, '6.') && '6' || '5' }}
+          
+          # 执行编译
+          ci/mac/build_for_mac.sh RelWithDebInfo ${{ matrix.build-arch }}
+
+      # 6. 获取ref最后一个/后的内容
+      - name: Get the version
+        shell: bash
+        id: get-version
+        # 修复旧语法：废弃了 ::set-output，改用 $GITHUB_OUTPUT
+        run: |
+          VERSION=${GITHUB_REF##*/}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      # 7. 打包
+      - name: Package
+        id: package
+        env:
+          ENV_QT_PATH: ${{ env.qt-install-path }}
+          publish_name: ${{ env.target-name }}-${{ env.plantform-des }}-${{ matrix.build-arch }}-Qt${{ matrix.qt-ver }}-${{ steps.get-version.outputs.version }}
+        run: |
+          ci/mac/publish_for_mac.sh ../build ${{ matrix.build-arch }}
+          ci/mac/package_for_mac.sh
+          mv ci/build/QtScrcpy.app ci/build/${{ env.publish_name }}.app
+          mv ci/build/QtScrcpy.dmg ci/build/${{ env.publish_name }}.dmg
+          # 修复旧语法：改为 $GITHUB_OUTPUT 传递参数给后续步骤
+          echo "package-name=${{ env.publish_name }}" >> $GITHUB_OUTPUT
+
+      # 8. 上传 Artifact
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.package-name }}.zip
+          path: ci/build/${{ steps.package.outputs.package-name }}.dmg
+
+      # 9. 自动发布到 Release
+      - name: Upload Release
+        if: startsWith(github.ref, 'refs/tags/')
+        # 升级到 v2，防止 Node.js 12/16 停用警告引发的流水线崩溃
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ci/build/${{ steps.package.outputs.package-name }}.dmg
+          asset_name: ${{ steps.package.outputs.package-name }}.dmg
+          tag: ${{ github.ref }}
+          overwrite: true
