@@ -14,24 +14,15 @@ on:
 jobs:
   build:
     name: Build
-    # macos-13 (Intel) runners are no longer supported by GitHub Actions.
-    # Use macos-14 (Apple Silicon) for all builds:
-    # - Qt6: native arm64 build on macos-14
-    # - Qt5: x86_64 build via Rosetta 2 on macos-14 (clang_64 Qt tools run under Rosetta)
-    # https://github.com/actions/runner-images?tab=readme-ov-file#available-images
     runs-on: ${{ matrix.runs-on }}
     strategy:
       matrix:
-        qt-ver: [5.15.2, 6.5.3]        
-        # 配置qt-ver的额外设置qt-arch-install，build-arch
+        # 【核心修改】：只保留 5.15.2，移除了 6.5.3
+        qt-ver: [5.15.2]        
         include:
           - qt-ver: 5.15.2
             qt-arch-install: clang_64
             build-arch: x64
-            runs-on: macos-14
-          - qt-ver: 6.5.3
-            qt-arch-install: arm64
-            build-arch: arm64
             runs-on: macos-14
     env:
       target-name: QtScrcpy
@@ -61,24 +52,49 @@ jobs:
           version: ${{ matrix.qt-ver }}
           cached: ${{ steps.cache-qt.outputs.cache-hit }}
 
-      # 4. 安装 Qt6        
-      - name: Install Qt6        
-        if: startsWith(matrix.qt-ver, '6.')
-        uses: jurplel/install-qt-action@v4.1.1
-        with:
-          version: ${{ matrix.qt-ver }}
-          modules: qtmultimedia
-          cached: ${{ steps.cache-qt.outputs.cache-hit }}
-
-      # 5. 编译步骤
+      # 4. 编译步骤（由于只跑 Qt5，移除了此前针对 Qt6 的所有 sed 补丁）
       - name: Build MacOS
         env:
           ENV_QT_PATH: ${{ env.qt-install-path }}
-          # 显式告诉 cmake 去哪里找当前矩阵对应的 Qt cmake 配置文件
           CMAKE_PREFIX_PATH: ${{ env.qt-install-path }}/${{ matrix.qt-arch-install }}/lib/cmake
         run: |
           python ci/generate-version.py
-          
-          # 当检测到 Qt6 构建环境时，利用 sed 动态打补丁
-          if [ "${{ matrix.qt-ver }}" = "6.5.3" ]; then
-            echo "==== 检测到当前为 Qt6 构建环境，
+          ci/mac/build_for_mac.sh RelWithDebInfo ${{ matrix.build-arch }}
+
+      # 5. 获取ref最后一个/后的内容
+      - name: Get the version
+        shell: bash
+        id: get-version
+        run: |
+          VERSION=${GITHUB_REF##*/}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      # 6. 打包
+      - name: Package
+        id: package
+        env:
+          ENV_QT_PATH: ${{ env.qt-install-path }}
+          publish_name: ${{ env.target-name }}-${{ env.plantform-des }}-${{ matrix.build-arch }}-Qt${{ matrix.qt-ver }}-${{ steps.get-version.outputs.version }}
+        run: |
+          ci/mac/publish_for_mac.sh ../build ${{ matrix.build-arch }}
+          ci/mac/package_for_mac.sh
+          mv ci/build/QtScrcpy.app ci/build/${{ env.publish_name }}.app
+          mv ci/build/QtScrcpy.dmg ci/build/${{ env.publish_name }}.dmg
+          echo "package-name=${{ env.publish_name }}" >> $GITHUB_OUTPUT
+
+      # 7. 上传 Artifact
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.package-name }}.zip
+          path: ci/build/${{ steps.package.outputs.package-name }}.dmg
+
+      # 8. 自动发布到 Release
+      - name: Upload Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: ci/build/${{ steps.package.outputs.package-name }}.dmg
+          asset_name: ${{ steps.package.outputs.package-name }}.dmg
+          tag: ${{ github.ref }}
+          overwrite: true
