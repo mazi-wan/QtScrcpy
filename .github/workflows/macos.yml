@@ -35,21 +35,30 @@ jobs:
             runs-on: macos-14
     env:
       target-name: QtScrcpy
-      qt-install-path: ${{ github.workspace }}/Qt/${{ matrix.qt-ver }}/${{ matrix.qt-arch-install }}
+      qt-install-path: ${{ github.workspace }}/${{ matrix.qt-ver }}
       plantform-des: mac
     steps:
+      # 【修改 1】将 checkout 提至最前，并升级到 v4。确保 submodules 和完整的 git tags 被拉取
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: 'true'
+          ssh-key: ${{ secrets.BOT_SSH_KEY }}
+
       - name: Cache Qt
         id: cache-qt
         uses: actions/cache@v4
         with:
-          path: ${{ env.qt-install-path }}
+          path: ${{ env.qt-install-path }}/${{ matrix.qt-arch-install }}
           key: ${{ runner.os }}/${{ matrix.qt-ver }}/${{ matrix.qt-arch-install }}
+
       - name: Install Qt5
         if: startsWith(matrix.qt-ver, '5.')
         uses: jurplel/install-qt-action@v4.1.1
         with:
           version: ${{ matrix.qt-ver }}
           cached: ${{ steps.cache-qt.outputs.cache-hit }}
+
       - name: Install Qt6        
         if: startsWith(matrix.qt-ver, '6.')
         uses: jurplel/install-qt-action@v4.1.1
@@ -57,47 +66,50 @@ jobs:
           version: ${{ matrix.qt-ver }}
           modules: qtmultimedia
           cached: ${{ steps.cache-qt.outputs.cache-hit }}
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: 'true'
-          ssh-key: ${{ secrets.BOT_SSH_KEY }}
-      # Fetch git tags for version generation
-      - name: Fetch Git Tags
-        run: git fetch --tags --force
+
       # 编译
       - name: Build MacOS
         env:
           ENV_QT_PATH: ${{ env.qt-install-path }}
+          # 【修改 2】核心修复：将当前矩阵对应的 Qt CMake 路径显式注入 CMAKE_PREFIX_PATH 环境变量
+          CMAKE_PREFIX_PATH: ${{ env.qt-install-path }}/${{ matrix.qt-arch-install }}/lib/cmake
         run: |
           python ci/generate-version.py
           ci/mac/build_for_mac.sh RelWithDebInfo ${{ matrix.build-arch }}
+
       # 获取ref最后一个/后的内容
       - name: Get the version
         shell: bash
         id: get-version
-        # ${ GITHUB_REF/refs\/tags\// }是linux shell ${}的变量替换语法
-        run: echo ::set-output name=version::${GITHUB_REF##*/}
+        # 【修改 3】修复旧语法：GitHub Actions 删除了 ::set-output，改用 $GITHUB_OUTPUT 写入
+        run: |
+          VERSION=${GITHUB_REF##*/}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       # 打包
       - name: Package
         id: package
         env:
           ENV_QT_PATH: ${{ env.qt-install-path }}
-          publish_name: ${{ env.target-name }}-${{ env.plantform-des }}-${{ matrix.build-arch }}-Qt${{matrix.qt-ver}}-${{ steps.get-version.outputs.version }}
+          publish_name: ${{ env.target-name }}-${{ env.plantform-des }}-${{ matrix.build-arch }}-Qt${{ matrix.qt-ver }}-${{ steps.get-version.outputs.version }}
         run: |
           ci/mac/publish_for_mac.sh ../build ${{ matrix.build-arch }}
           ci/mac/package_for_mac.sh
           mv ci/build/QtScrcpy.app ci/build/${{ env.publish_name }}.app
           mv ci/build/QtScrcpy.dmg ci/build/${{ env.publish_name }}.dmg
-          echo "::set-output name=package-name::${{ env.publish_name }}"
+          # 【修改 4】修复旧语法：改为 $GITHUB_OUTPUT 传递参数给后续步骤
+          echo "package-name=${{ env.publish_name }}" >> $GITHUB_OUTPUT
+
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.package.outputs.package-name }}.zip
           path: ci/build/${{ steps.package.outputs.package-name }}.dmg
+
       # Upload to release
       - name: Upload Release
         if: startsWith(github.ref, 'refs/tags/')
-        uses: svenstaro/upload-release-action@v1-release
+        # 【修改 5】升级 upload-release-action 版本，避免依赖 node12/node16 导致停用警告
+        uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: ci/build/${{ steps.package.outputs.package-name }}.dmg
