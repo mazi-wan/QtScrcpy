@@ -1,103 +1,109 @@
-name: MacOS
-on: 
-  workflow_dispatch:
-  push:
-    paths:
-      - 'QtScrcpy/**'
-      - '!QtScrcpy/res/**'
-      - '.github/workflows/macos.yml'
-  pull_request:
-    paths:
-      - 'QtScrcpy/**'
-      - '!QtScrcpy/res/**'
-      - '.github/workflows/macos.yml'
-jobs:
-  build:
-    name: Build
-    # macos-13 (Intel) runners are no longer supported by GitHub Actions.
-    # Use macos-14 (Apple Silicon) for all builds:
-    # - Qt6: native arm64 build on macos-14
-    # - Qt5: x86_64 build via Rosetta 2 on macos-14 (clang_64 Qt tools run under Rosetta)
-    # https://github.com/actions/runner-images?tab=readme-ov-file#available-images
-    runs-on: ${{ matrix.runs-on }}
-    strategy:
-      matrix:
-        qt-ver: [5.15.2, 6.5.3]        
-        # 配置qt-ver的额外设置qt-arch-install，build-arch
-        include:
-          - qt-ver: 5.15.2
-            qt-arch-install: clang_64
-            build-arch: x64
-            runs-on: macos-14
-          - qt-ver: 6.5.3
-            qt-arch-install: arm64
-            build-arch: arm64
-            runs-on: macos-14
-    env:
-      target-name: QtScrcpy
-      qt-install-path: ${{ github.workspace }}/${{ matrix.qt-ver }}
-      plantform-des: mac
-    steps:
-      - name: Cache Qt
-        id: cache-qt
-        uses: actions/cache@v4
-        with:
-          path: ${{ env.qt-install-path }}/${{ matrix.qt-arch-install }}
-          key: ${{ runner.os }}/${{ matrix.qt-ver }}/${{ matrix.qt-arch-install }}
-      - name: Install Qt5
-        if: startsWith(matrix.qt-ver, '5.')
-        uses: jurplel/install-qt-action@v4.1.1
-        with:
-          version: ${{ matrix.qt-ver }}
-          cached: ${{ steps.cache-qt.outputs.cache-hit }}
-      - name: Install Qt6        
-        if: startsWith(matrix.qt-ver, '6.')
-        uses: jurplel/install-qt-action@v4.1.1
-        with:
-          version: ${{ matrix.qt-ver }}
-          modules: qtmultimedia
-          cached: ${{ steps.cache-qt.outputs.cache-hit }}
-      - uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-          submodules: 'true'
-          ssh-key: ${{ secrets.BOT_SSH_KEY }}
-      # 编译
-      - name: Build MacOS
-        env:
-          ENV_QT_PATH: ${{ env.qt-install-path }}
-        run: |
-          python ci/generate-version.py
-          ci/mac/build_for_mac.sh RelWithDebInfo ${{ matrix.build-arch }}
-      # 获取ref最后一个/后的内容
-      - name: Get the version
-        shell: bash
-        id: get-version
-        # ${ GITHUB_REF/refs\/tags\// }是linux shell ${}的变量替换语法
-        run: echo ::set-output name=version::${GITHUB_REF##*/}
-      # 打包
-      - name: Package
-        id: package
-        env:
-          ENV_QT_PATH: ${{ env.qt-install-path }}
-          publish_name: ${{ env.target-name }}-${{ env.plantform-des }}-${{ matrix.build-arch }}-Qt${{matrix.qt-ver}}-${{ steps.get-version.outputs.version }}
-        run: |
-          ci/mac/publish_for_mac.sh ../build ${{ matrix.build-arch }}
-          ci/mac/package_for_mac.sh
-          mv ci/build/QtScrcpy.app ci/build/${{ env.publish_name }}.app
-          mv ci/build/QtScrcpy.dmg ci/build/${{ env.publish_name }}.dmg
-          echo "::set-output name=package-name::${{ env.publish_name }}"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.package.outputs.package-name }}.zip
-          path: ci/build/${{ steps.package.outputs.package-name }}.dmg
-      # Upload to release
-      - name: Upload Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: svenstaro/upload-release-action@v1-release
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: ci/build/${{ steps.package.outputs.package-name }}.dmg
-          asset_name: ${{ steps.package.outputs.package-name }}.dmg
-          tag: ${{ github.ref }}
-          overwrite: true
+
+echo
+echo
+echo ---------------------------------------------------------------
+echo check ENV
+echo ---------------------------------------------------------------
+
+# 从环境变量获取必要参数
+# 例如 /Users/barry/Qt5.12.5/5.12.5
+echo ENV_QT_PATH $ENV_QT_PATH
+
+# 获取绝对路径，保证其他目录执行此脚本依然正确
+{
+cd $(dirname "$0")
+script_path=$(pwd)
+cd -
+} &> /dev/null # disable output
+# 设置当前目录，cd的目录影响接下来执行程序的工作目录
+old_cd=$(pwd)
+cd $(dirname "$0")
+
+# 启动参数声明
+build_mode=RelWithDebInfo
+cpu_arch=arm64
+
+echo
+echo
+echo ---------------------------------------------------------------
+echo check build param[Debug/Release/MinSizeRel/RelWithDebInfo]
+echo ---------------------------------------------------------------
+
+# 编译参数检查
+build_mode=$(echo $1)
+if [[ $build_mode != "Release" && $build_mode != "Debug" && $build_mode != "MinSizeRel" && $build_mode != "RelWithDebInfo" ]]; then
+    echo "error: unkonow build mode -- $1"
+    exit 1
+fi
+
+echo
+echo
+echo ---------------------------------------------------------------
+echo check cpu arch[x64/arm64]
+echo ---------------------------------------------------------------
+
+cpu_arch=$(echo $2)
+if [[ $cpu_arch != "x64" && $cpu_arch != "arm64" ]]; then
+    echo "error: unkonow cpu mode -- $2"
+    exit 1
+fi
+
+# 提示
+echo current build mode: $build_mode
+echo current cpu mode: $cpu_arch
+
+cmake_arch=x86_64
+if [ $cpu_arch == "x64" ]; then
+    # For Qt 5.15.2, jurplel/install-qt-action installs to {ENV_QT_PATH}/lib/cmake/Qt5
+    # where ENV_QT_PATH already includes the architecture (clang_64)
+    qt_cmake_path=$ENV_QT_PATH/lib/cmake/Qt5
+    cmake_arch=x86_64
+else
+    # For Qt 6.5.3 with arm64, the path includes lib/cmake/Qt6
+    qt_cmake_path=$ENV_QT_PATH/lib/cmake/Qt6
+    cmake_arch=arm64
+fi
+
+echo "Qt CMake path: $qt_cmake_path"
+
+echo
+echo
+echo ---------------------------------------------------------------
+echo begin cmake build
+echo ---------------------------------------------------------------
+
+# 删除输出目录
+output_path=$script_path../../output
+if [ -d "$output_path" ]; then
+    rm -rf $output_path
+fi
+# 删除编译目录
+build_path=$script_path/../build_temp
+if [ -d "$build_path" ]; then
+    rm -rf $build_path
+fi
+mkdir $build_path
+cd $build_path
+
+cmake_params="-DCMAKE_PREFIX_PATH=$qt_cmake_path -DCMAKE_BUILD_TYPE=$build_mode -DCMAKE_OSX_ARCHITECTURES=$cmake_arch"
+cmake $cmake_params ../..
+if [ $? -ne 0 ] ;then
+    echo "cmake failed"
+    exit 1
+fi
+
+cmake --build . --config $build_mode -j8
+if [ $? -ne 0 ] ;then
+    echo "cmake build failed"
+    exit 1
+fi
+
+echo
+echo
+echo ---------------------------------------------------------------
+echo finish!!!
+echo ---------------------------------------------------------------
+
+# 恢复当前目录
+cd $old_cd
+exit 0
