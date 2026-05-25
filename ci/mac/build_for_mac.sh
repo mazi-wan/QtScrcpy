@@ -54,17 +54,12 @@ echo current cpu mode: $cpu_arch
 
 cmake_arch=x86_64
 if [ $cpu_arch == "x64" ]; then
-    # For Qt 5.15.2, jurplel/install-qt-action installs to {ENV_QT_PATH}/lib/cmake/Qt5
-    # where ENV_QT_PATH already includes the architecture (clang_64)
-    qt_cmake_path=$ENV_QT_PATH/lib/cmake/Qt5
+    qt_cmake_path=$ENV_QT_PATH/clang_64/lib/cmake/Qt5
     cmake_arch=x86_64
 else
-    # For Qt 6.5.3 with arm64, the path includes lib/cmake/Qt6
-    qt_cmake_path=$ENV_QT_PATH/lib/cmake/Qt6
+    qt_cmake_path=$ENV_QT_PATH/macos/lib/cmake/Qt6
     cmake_arch=arm64
 fi
-
-echo "Qt CMake path: $qt_cmake_path"
 
 echo
 echo
